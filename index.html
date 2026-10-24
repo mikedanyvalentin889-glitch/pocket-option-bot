@@ -38,6 +38,7 @@ small,.mut{color:var(--mut)}
 <div class="bar">
   <button class="p" id="go">🔄 Analyser</button>
   <span id="cats"></span>
+  <select id="tf" title="Intervalle des bougies"><option value="1m">Bougies 1 min</option><option value="5m">5 min</option><option value="15m">15 min</option><option value="1h">1 heure</option><option value="1d" selected>1 jour</option></select>
   <select id="flt"><option value="all">Tous signaux</option><option value="buy">Acheter</option><option value="sell">Vendre</option></select>
   <span class="mut" id="st"></span>
 </div>
@@ -48,10 +49,25 @@ small,.mut{color:var(--mut)}
 </div>
 
 <div class="wrap"><table>
-<thead><tr><th data-k="n">Actif</th><th data-k="c">Catégorie</th><th data-k="p">Prix</th><th data-k="d">24h/1j</th><th data-k="r">RSI</th><th data-k="s">Score</th><th data-k="sg">Signal</th></tr></thead>
+<thead><tr><th data-k="n">Actif</th><th data-k="c">Catégorie</th><th data-k="p">Prix</th><th data-k="d">Var. bougie</th><th data-k="r">RSI</th><th data-k="s">Score</th><th data-k="sg">Signal</th></tr></thead>
 <tbody id="tb"></tbody></table></div>
 
 <div id="det"><div id="dt" style="font-weight:700;font-size:16px"></div><canvas id="cv"></canvas><div class="g" id="gd"></div></div>
+
+<h2 style="font-size:17px;margin:22px 0 6px">📒 Journal de trades</h2>
+<div class="warn" style="border-color:var(--ac)">Note chaque trade (démo ou réel). Le calcul te dit si tu dépasses le taux de réussite minimum pour ne pas perdre.</div>
+<div class="bar">
+  <input id="ja" size="10" placeholder="Actif (EURUSD)">
+  <select id="jd"><option>Achat</option><option>Vente</option></select>
+  <select id="jt"><option>1 min</option><option>3 sec</option><option>5 min</option><option>15 min</option><option>Autre</option></select>
+  <input id="jm" type="number" min="0" step="any" placeholder="Mise" style="width:80px">
+  <input id="jp" type="number" min="1" max="100" value="85" title="Payout %" style="width:70px">
+  <select id="jr"><option value="W">Gagné</option><option value="L">Perdu</option></select>
+  <button class="p" id="jadd">Ajouter</button>
+  <button id="jclr">Tout effacer</button>
+</div>
+<div class="g" id="js"></div>
+<div class="wrap" style="margin-top:8px"><table style="min-width:520px"><thead><tr><th>#</th><th>Actif</th><th>Sens</th><th>Durée</th><th>Mise</th><th>Résultat</th><th></th></tr></thead><tbody id="jb"></tbody></table></div>
 
 <p class="mut" style="font-size:12px">Sources : Frankfurter (taux BCE, clôtures journalières) · Binance (crypto, public) · Twelve Data (optionnel). Le score va de −5 à +5 : ≥3 Acheter, ≤−3 Vendre. Les indicateurs de PocketOptionAPI (Python/WebSocket, nécessite un SSID, dépôt archivé) ne fonctionnent pas dans un navigateur ; ce site utilise donc des données publiques.</p>
 
@@ -105,10 +121,10 @@ async function loadFX(){
   const cl=dates.map(d=>rate(d,b)/rate(d,a));
   const r=analyse(`${a}/${b}`,'Forex',cl,dates);if(r)rows.push(r)});
 }
-async function loadCrypto(){
+async function loadCrypto(tf){
  await Promise.all(CR.map(async c=>{
-  try{const j=await jget([`https://api.binance.com/api/v3/klines?symbol=${c}USDT&interval=1d&limit=250`,`https://data-api.binance.vision/api/v3/klines?symbol=${c}USDT&interval=1d&limit=250`]);
-   const r=analyse(`${c}/USDT`,'Crypto',j.map(k=>+k[4]),j.map(k=>new Date(k[0]).toISOString().slice(0,10)));if(r)rows.push(r)}catch(e){}}))
+  try{const j=await jget([`https://api.binance.com/api/v3/klines?symbol=${c}USDT&interval=${tf}&limit=250`,`https://data-api.binance.vision/api/v3/klines?symbol=${c}USDT&interval=${tf}&limit=250`]);
+   const r=analyse(`${c}/USDT`,'Crypto',j.map(k=>+k[4]),j.map(k=>new Date(k[0]).toISOString().slice(0,tf==='1d'?10:16).replace('T',' ')));if(r)rows.push(r)}catch(e){}}))
 }
 async function loadTD(key){
  for(let i=0;i<TD.length;i++){
@@ -123,12 +139,15 @@ async function loadTD(key){
 $('#go').onclick=async()=>{
  if(busy)return;busy=true;rows=[];draw();$('#det').style.display='none';
  $('#st').textContent='Chargement…';
- const res=await Promise.allSettled([loadFX(),loadCrypto()]);
- if(res[0].status==='rejected'||res[1].status==='rejected')$('#st').textContent='Certaines sources sont indisponibles';
+ const tf=$('#tf').value,daily=tf==='1d';
+ const res=await Promise.allSettled(daily?[loadFX(),loadCrypto(tf)]:[loadCrypto(tf)]);
+ if(res.some(x=>x.status==='rejected'))$('#st').textContent='Certaines sources sont indisponibles';
  draw();
  const key=$('#key').value.trim();
- if(key)await loadTD(key);
- $('#st').textContent=`${rows.length} actifs analysés · ${new Date().toLocaleTimeString('fr')}`;busy=false;draw();
+ if(key&&daily)await loadTD(key);
+ if(!daily)$('#st').textContent='Intraday : crypto seulement (pas de source gratuite fiable pour le forex en minutes)';
+ else if(!rows.length)$('#st').textContent='Aucune donnée reçue';
+ $('#st').textContent=`${rows.length} actifs analysés (${tf}) · ${new Date().toLocaleTimeString('fr')}`+(daily?'':' · intraday = crypto seulement');busy=false;draw();
 };
 
 // ---------- Affichage ----------
@@ -160,6 +179,32 @@ function chart(r){
  x.fillStyle='#8b98a5';x.font='11px sans-serif';x.fillText('— prix  — SMA20  — SMA50 · '+r.dates.at(-N)+' → '+r.dates.at(-1),10,12);
 }
 draw();
+
+// ---------- Journal ----------
+let J=[];
+try{J=JSON.parse(localStorage.getItem('jr')||'[]')}catch(e){}
+const saveJ=()=>{try{localStorage.setItem('jr',JSON.stringify(J))}catch(e){}};
+$('#jadd').onclick=()=>{
+ const m=parseFloat($('#jm').value),p=parseFloat($('#jp').value);
+ if(!(m>0)||!(p>0))return alert('Entre une mise et un payout valides');
+ J.push({a:$('#ja').value.trim()||'?',d:$('#jd').value,t:$('#jt').value,m,p,r:$('#jr').value});
+ saveJ();drawJ();
+};
+$('#jclr').onclick=()=>{if(confirm('Effacer tout le journal ?')){J=[];saveJ();drawJ()}};
+$('#jb').onclick=e=>{const i=e.target.dataset.x;if(i!==undefined){J.splice(+i,1);saveJ();drawJ()}};
+function drawJ(){
+ const n=J.length,w=J.filter(x=>x.r==='W').length;
+ const pnl=J.reduce((s,x)=>s+(x.r==='W'?x.m*x.p/100:-x.m),0);
+ const avgP=n?J.reduce((s,x)=>s+x.p,0)/n:85,be=100/(1+avgP/100),wr=n?w/n*100:0;
+ let streak=0;for(let i=n-1;i>=0&&J[i].r==='L';i--)streak++;
+ let v='Pas encore de données';
+ if(n>=1&&n<100)v=`Seulement ${n} trades : trop peu pour conclure (vise 200+).`;
+ else if(n>=100)v=wr>be+3?'Au-dessus du seuil, mais vérifie sur plus de trades.':wr>=be-3?'Proche du seuil : aucun avantage prouvé.':'En dessous du seuil : tu perds de l\'argent à ce rythme.';
+ const c=pnl>=0?'up':'dn';
+ $('#js').innerHTML=[['Trades',n],['Réussite',wr.toFixed(1)+'%'],['Seuil pour 0 perte',be.toFixed(1)+'%'],['Résultat net',`<span class="${c}">${pnl>=0?'+':''}${pnl.toFixed(2)}</span>`],['Pertes d\'affilée',streak+(streak>=3?' ⛔ stop pour aujourd\'hui':'')],['Verdict',v]].map(x=>`<div><b>${x[0]}</b>${x[1]}</div>`).join('');
+ $('#jb').innerHTML=J.map((x,i)=>`<tr><td>${i+1}</td><td>${x.a}</td><td>${x.d}</td><td>${x.t}</td><td>${x.m}</td><td class="${x.r==='W'?'up':'dn'}">${x.r==='W'?'Gagné +'+(x.m*x.p/100).toFixed(2):'Perdu −'+x.m}</td><td><button data-x="${i}">✕</button></td></tr>`).reverse().join('');
+}
+drawJ();
 </script>
 </body>
 </html>
