@@ -128,7 +128,7 @@ function analyse(name,catg,closes,dates){
 const fmt=v=>v>=1000?v.toLocaleString('fr',{maximumFractionDigits:2}):v>=10?v.toFixed(3):v.toFixed(5);
 
 // ---------- Données ----------
-async function jget(urls){for(const u of urls){try{const r=await fetch(u);if(r.ok)return await r.json()}catch(e){}}throw new Error('fetch')}
+async function jget(urls){for(const u of urls){try{const c=new AbortController(),t=setTimeout(()=>c.abort(),15000);const r=await fetch(u,{signal:c.signal});clearTimeout(t);if(r.ok)return await r.json();try{const j=await r.json();if(j&&j.code)return j}catch(e){}}catch(e){}}throw new Error('fetch')}
 async function loadFX(){
  const st=new Date(Date.now()-280*864e5).toISOString().slice(0,10);
  const q=`${st}..?base=EUR&symbols=${CUR.join(',')}`;
@@ -158,29 +158,33 @@ const FXM=['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','USD/CHF','EUR/JPY'
 const TDI={'1m':'1min','5m':'5min','15m':'15min','1h':'1h'};
 async function loadFXintra(key,tf){
  const L=FXM.slice(0,+$('#np').value);
- for(let i=0;i<L.length;i++){
-  $('#st').textContent=`Forex ${tf} : ${i+1}/${L.length}…`;
-  try{const j=await jget([`https://api.twelvedata.com/time_series?symbol=${L[i]}&interval=${TDI[tf]}&outputsize=200&apikey=${key}`]);
-   if(j.values){const v=j.values.slice().reverse();const r=analyse(L[i],'Forex',v.map(x=>+x.close),v.map(x=>x.datetime.slice(0,16)));if(r){put(r);draw()}}
-   else if(j.code===429){$('#st').textContent='Limite Twelve Data atteinte, pause 1 min…';await new Promise(r=>setTimeout(r,62000));i--}
-   else{fxErr=j.message||('erreur '+j.code);if(j.code===401||j.code===400)return}
+ const one=async(sym,retry=1)=>{
+  try{const j=await jget([`https://api.twelvedata.com/time_series?symbol=${sym}&interval=${TDI[tf]}&outputsize=200&apikey=${key}`]);
+   if(j.values){const v=j.values.slice().reverse();const r=analyse(sym,'Forex',v.map(x=>+x.close),v.map(x=>x.datetime.slice(0,16)));if(r){put(r);draw()}}
+   else if(j.code===429&&retry){$('#st').textContent='Limite Twelve Data atteinte, pause 1 min…';await new Promise(r=>setTimeout(r,62000));return one(sym,0)}
+   else fxErr=j.message||('erreur '+j.code);
   }catch(e){fxErr='connexion bloquée (réseau, VPN ou bloqueur de pub ?)'}
- }
+ };
+ await Promise.all(L.map(x=>one(x)));
 }
 let fxErr='';
-$('#go').onclick=async()=>{
- if(busy)return;busy=true;if(!($('#auto').checked&&rows.length)){rows=[];draw();$('#det').style.display='none'}
+async function runScan(){
+ if(!($('#auto').checked&&rows.length)){rows=[];draw();$('#det').style.display='none'}
  $('#st').textContent='Chargement…';
- const tf=$('#tf').value,daily=tf==='1d';
- const res=await Promise.allSettled(daily?[loadFX(),loadCrypto(tf)]:[loadCrypto(tf)]);
- if(res.some(x=>x.status==='rejected'))$('#st').textContent='Certaines sources sont indisponibles';
- draw();
- const key=$('#key').value.trim();
- if(key&&daily)await loadTD(key);
- fxErr='';if(key&&!daily)await loadFXintra(key,tf);
+ const tf=$('#tf').value,daily=tf==='1d',key=$('#key').value.trim();fxErr='';
+ const jobs=[loadCrypto(tf)];
+ if(daily)jobs.push(loadFX());
+ if(key&&daily)jobs.push(loadTD(key));
+ if(key&&!daily)jobs.push(loadFXintra(key,tf));
+ const res=await Promise.allSettled(jobs);
  const wk=[0,6].includes(new Date().getUTCDay());
- $('#st').textContent=`${rows.length} actifs analysés (${tf}) · ${new Date().toLocaleTimeString('fr')}`+(!daily&&!key?' · forex intraday : ajoute une clé Twelve Data':'')+(wk&&key?' · ⚠️ forex fermé le week-end : données de vendredi':'')+(fxErr?' · ❌ Twelve Data : '+fxErr:'')+(key&&!daily&&$('#auto').checked&&+$('#fr').value<300?` · ⚠️ ~${Math.round(3600/+$('#fr').value*$('#np').value)} requêtes/h (limite gratuite : 800/jour)`:'');busy=false;draw();
- if(typeof alertNew==='function')alertNew();
+ $('#st').textContent=`${rows.length} actifs analysés (${tf}) · ${new Date().toLocaleTimeString('fr')}`+(res.some(x=>x.status==='rejected')?' · ⚠️ une source indisponible':'')+(!daily&&!key?' · forex intraday : ajoute une clé Twelve Data':'')+(wk&&key?' · ⚠️ forex fermé le week-end : données de vendredi':'')+(fxErr?' · ❌ Twelve Data : '+fxErr:'')+(key&&!daily&&$('#auto').checked&&+$('#fr').value<300?` · ⚠️ ~${Math.round(3600/+$('#fr').value*$('#np').value)} requêtes/h (limite gratuite : 800/jour)`:'');
+ draw();alertNew();
+}
+$('#go').onclick=async()=>{
+ if(busy)return;busy=true;
+ try{await runScan()}catch(e){$('#st').textContent='Erreur : '+e.message}
+ finally{busy=false;draw()}
 };
 
 // ---------- Affichage ----------
@@ -214,13 +218,21 @@ function chart(r){
 draw();
 
 // ---------- Auto + alertes ----------
-let timer=null,prevSig=null;
-const EVERY={'1m':60,'5m':300,'15m':900,'1h':1800,'1d':3600};
+let timer=null,worker=null,wl=null,prevSig=null;
+function stopTick(){clearInterval(timer);timer=null;if(worker){worker.terminate();worker=null}}
+async function keepAwake(){try{if('wakeLock' in navigator&&$('#auto').checked)wl=await navigator.wakeLock.request('screen')}catch(e){}}
 function setupAuto(){
- clearInterval(timer);timer=null;
- if(!$('#auto').checked)return;
- timer=setInterval(()=>$('#go').click(),+$('#fr').value*1000);
+ stopTick();
+ if(!$('#auto').checked){try{wl&&wl.release()}catch(e){}wl=null;return}
+ const ms=+$('#fr').value*1000,fire=()=>$('#go').click();
+ try{
+  worker=new Worker(URL.createObjectURL(new Blob([`setInterval(()=>postMessage(1),${ms})`],{type:'text/javascript'})));
+  worker.onmessage=fire;
+  worker.onerror=()=>{stopTick();timer=setInterval(fire,ms)};
+ }catch(e){timer=setInterval(fire,ms)}
+ keepAwake();
 }
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&$('#auto').checked){keepAwake();$('#go').click()}});
 $('#auto').onchange=async()=>{
  if($('#auto').checked){
   prevSig=null;
