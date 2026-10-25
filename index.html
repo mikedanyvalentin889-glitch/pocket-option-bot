@@ -16,6 +16,7 @@ button{cursor:pointer}
 .big.stop{background:#3a2327;border-color:#6b2a33;color:#ff8a94}.big:disabled{opacity:.6}
 .card{background:#161c24;border:1px solid #232d3a;border-radius:12px;padding:12px;margin-top:10px;text-align:center}
 .card.up{background:rgba(31,191,117,.15);border-color:#1fbf75}.card.dn{background:rgba(240,68,82,.15);border-color:#f04452}
+.chips{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}.chips button{flex:1;font-size:12px;padding:6px 4px}.chips .on{border-color:#2f6bff;color:#7aa2ff;background:#16233f}
 .sig{display:flex;align-items:center;justify-content:center;gap:12px;min-height:84px}
 .sig svg{width:68px;height:68px}.sig .t{font-size:22px;font-weight:900}.sig small{display:block;font-size:12px;font-weight:400;color:#9aa7b4}
 .up .t{color:#1fbf75}.dn .t{color:#f04452}
@@ -44,9 +45,10 @@ details{margin-top:10px;font-size:12.5px;color:#8b98a5}details input{width:68%}
 <p id="ph">Le scan est dans la petite fenêtre. Ferme-la pour le ramener ici.</p>
 <div id="app">
  <div class="top"><b>📡 SCAN PRO</b><button id="pin" title="Petite fenêtre flottante">📌</button></div>
- <div class="tabs"><button id="t1" class="on">⚡ Live 5 s · SOL</button><button id="t2">Forex 1 min</button></div>
+ <div class="tabs"><button id="t1" class="on">⚡ Live 5 s</button><button id="t2">EUR/USD 1 min</button></div>
 
  <section id="live">
+  <div class="chips" id="ch"></div>
   <button id="go5" class="big">▶ SCAN</button>
   <div class="card" id="sc">
    <div class="sig" id="sg"><div class="t" style="color:#8b98a5;font-size:15px">Appuie sur SCAN</div></div>
@@ -55,7 +57,7 @@ details{margin-top:10px;font-size:12.5px;color:#8b98a5}details input{width:68%}
    <div class="st"><span class="dot" id="dt"></span><span id="stt">Arrêté</span></div>
   </div>
   <div class="card" style="text-align:left">
-   <b>🎯 Précision mesurée en direct</b>
+   <b>🎯 Précision mesurée · <span id="an"></span></b>
    <div class="grid"><div><b>Signaux testés</b><span id="sn">0</span></div><div><b>Réussite</b><span id="sr">–</span></div><div><b>Seuil pour ne pas perdre</b><span id="sb">–</span></div><div><b>Réussite sûre (95 %)</b><span id="sl">–</span></div></div>
    <div class="verdict v-w" id="vd">Calibrage : lance le scan et laisse-le tourner.</div>
    <div class="dots" id="ds"></div>
@@ -68,17 +70,21 @@ details{margin-top:10px;font-size:12.5px;color:#8b98a5}details input{width:68%}
   <div id="msg"></div><div id="list"></div>
  </section>
 
- <details id="kb"><summary>Clé Twelve Data (forex, gratuite)</summary>
-  <input id="key" placeholder="Colle ta clé ici"> <button id="sv">OK</button>
-  <div>twelvedata.com · reste dans ton navigateur.</div></details>
- <div class="foot">Signaux techniques : <b>pas un conseil financier</b>. Rien ne garantit un gain ; à 5 s le résultat est proche du hasard. Le scan mesure sa propre précision (avec 2 s de délai de clic) et te dit quand ne PAS trader. Les prix viennent de Binance, pas de Pocket Option : teste en démo.</div>
+ <details id="kb"><summary>Clés gratuites</summary>
+  <input id="fk" placeholder="Clé Finnhub (live forex / Apple)"> <button id="sf">OK</button>
+  <div style="margin-bottom:8px">finnhub.io → Register. Pour le live EUR/USD, USD/JPY, AAPL.</div>
+  <input id="key" placeholder="Clé Twelve Data (onglet Forex 1 min)"> <button id="sv">OK</button>
+  <div>twelvedata.com · les clés restent dans ton navigateur.</div></details>
+ <div class="foot">Signaux techniques : <b>pas un conseil financier</b>. SOL : Binance (24h/24). EUR/USD, USD/JPY : forex fermé du vendredi soir au dimanche soir ; Apple : heures de Bourse US. Rien ne garantit un gain ; à 5 s le résultat est proche du hasard. Le scan mesure sa propre précision (avec 2 s de délai de clic) et te dit quand ne PAS trader. Les prix viennent de Binance, pas de Pocket Option : teste en démo.</div>
 </div>
 <script>
 const app=document.getElementById('app'),$=s=>app.querySelector(s);
 const ls={g:k=>{try{return localStorage.getItem(k)}catch(e){return null}},s:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 const ARROW='<svg viewBox="0 0 24 24"><path d="M12 3l9 10h-6v8H9v-8H3z" fill="currentColor"/></svg>';
 $('#key').value=ls.g('tdk')||'';
+$('#fk').value=ls.g('fhk')||'';
 $('#sv').onclick=()=>{ls.s('tdk',$('#key').value.trim());msg('Clé enregistrée')};
+$('#sf').onclick=()=>{ls.s('fhk',$('#fk').value.trim())};
 const msg=t=>{$('#msg').textContent=t};
 function tab(n){$('#live').hidden=n!==1;$('#fx').hidden=n!==2;$('#t1').classList.toggle('on',n===1);$('#t2').classList.toggle('on',n===2);if(n===2&&!$('#key').value)$('#kb').open=true}
 $('#t1').onclick=()=>tab(1);$('#t2').onclick=()=>tab(2);
@@ -94,25 +100,41 @@ function score(c){
  let s=(p>s50?1:-1)+(s20>s50?1:-1)+(h>0?1:-1);if(R<30)s++;else if(R>70)s--;if(pb<.05)s++;else if(pb>.95)s--;return{s,px:p}}
 const fmt=v=>v>=50?v.toFixed(3):v.toFixed(5);
 
-// ---------- LIVE 5 s (Binance, chaque transaction) ----------
+// ---------- LIVE 5 s ----------
+const AS={SOL:{n:'SOL/USDT',src:'bn',sym:'solusdt',d:3},EURUSD:{n:'EUR/USD',src:'fh',sym:'OANDA:EUR_USD',d:5},USDJPY:{n:'USD/JPY',src:'fh',sym:'OANDA:USD_JPY',d:3},AAPL:{n:'Apple',src:'fh',sym:'AAPL',d:2}};
 const DELAY=2,HOR=5,WARM=20;
-let ws=null,run=false,bars=[],cur={b:0,s:0,n:0},last=0,tk=null,active=null,cool=0,timers=[];
-let ST;try{ST=JSON.parse(ls.g('st5')||'')||{n:0,w:0,h:[]}}catch(e){ST={n:0,w:0,h:[]}}
+let A='SOL',ws=null,run=false,bars=[],cur={b:0,s:0,n:0},last=0,lastT=0,prevP=0,prevSide=0,t0=0,tk=null,active=null,cool=0,timers=[],fhErr='';
+let ST={};try{ST=JSON.parse(ls.g('st6')||'{}')||{}}catch(e){}
+if(!ST.SOL){try{const o=JSON.parse(ls.g('st5')||'');if(o&&o.n)ST.SOL=o}catch(e){}}
+const S=()=>ST[A]||(ST[A]={n:0,w:0,h:[]});
+const save=()=>ls.s('st6',JSON.stringify(ST));
+function chips(){$('#ch').innerHTML=Object.keys(AS).map(k=>`<button data-k="${k}" class="${k===A?'on':''}">${AS[k].n}</button>`).join('');$('#an').textContent=AS[A].n}
+$('#ch').onclick=e=>{const k=e.target.dataset.k;if(!k||k===A)return;const was=run;if(was)stopLive();A=k;chips();stats();idle();if(was)startLive()};
 function setState(t,c){$('#stt').textContent=t;$('#dt').className='dot '+(c||'')}
+function idle(){$('#sc').className='card';$('#sg').innerHTML='<div class="t" style="color:#8b98a5;font-size:15px">Appuie sur SCAN</div>';$('#mt').innerHTML='';$('#pb').style.width='0'}
+function onTick(p,q,side){last=p;lastT=Date.now();if(!side)side=p>prevP?1:p<prevP?-1:prevSide;if(side)prevSide=side;prevP=p;side>0?cur.b+=q:cur.s+=q;cur.n++}
 function connect(u){
- const urls=['wss://stream.binance.com:9443/ws/solusdt@trade','wss://data-stream.binance.vision/ws/solusdt@trade'];
- ws=new WebSocket(urls[u%2]);
- ws.onopen=()=>setState('Connecté · collecte des prix…','wait');
- ws.onmessage=e=>{const d=JSON.parse(e.data),q=+d.q;last=+d.p;d.m?cur.s+=q:cur.b+=q;cur.n++};
- ws.onclose=()=>{if(run){setState('Reconnexion…','wait');setTimeout(()=>run&&connect(u+1),1500)}};
+ const a=AS[A];let url;
+ if(a.src==='bn')url=['wss://stream.binance.com:9443/ws/','wss://data-stream.binance.vision/ws/'][u%2]+a.sym+'@trade';
+ else url='wss://ws.finnhub.io?token='+encodeURIComponent($('#fk').value.trim());
+ ws=new WebSocket(url);
+ ws.onopen=()=>{if(a.src==='fh')ws.send(JSON.stringify({type:'subscribe',symbol:a.sym}));setState('Connecté · en attente des prix…','wait')};
+ ws.onmessage=e=>{const d=JSON.parse(e.data);
+  if(a.src==='bn')onTick(+d.p,+d.q,d.m?-1:1);
+  else if(d.type==='trade')d.data.forEach(x=>{if(x.s===a.sym)onTick(+x.p,+x.v||1,0)});
+  else if(d.type==='error')fhErr=d.msg||'erreur'};
+ ws.onclose=()=>{if(run){setState('Reconnexion…','wait');setTimeout(()=>run&&connect(u+1),2500)}};
  ws.onerror=()=>{try{ws.close()}catch(e){}};
 }
 function liveScore(){
  const P=bars.map(x=>x.p),e5=ema(P,5).at(-1),e20=ema(P,20).at(-1),mom=P.at(-1)-P.at(-6);
- const L=bars.slice(-10),b=L.reduce((x,y)=>x+y.b,0),s=L.reduce((x,y)=>x+y.s,0),imb=b+s?(b-s)/(b+s):0;
- return{sc:(e5>e20?1:-1)+(mom>0?1:mom<0?-1:0)+(imb>.25?1:imb<-.25?-1:0),imb,mom}}
+ const L=bars.slice(-10),b=L.reduce((x,y)=>x+y.b,0),sv=L.reduce((x,y)=>x+y.s,0),imb=b+sv?(b-sv)/(b+sv):0;
+ return{sc:(e5>e20?1:-1)+(mom>0?1:mom<0?-1:0)+(imb>.25?1:imb<-.25?-1:0),imb}}
 function tick(){
- if(!last)return;
+ const age=Date.now()-lastT;
+ if(!last||age>10000){
+  const x=last?`Aucun prix depuis ${Math.round(age/1000)} s`:(Date.now()-t0>10000?'Aucun prix reçu':'En attente du premier prix…');
+  setState('⚠️ '+x+' · marché fermé ?'+(fhErr?' ('+fhErr+')':''),'wait');return}
  bars.push({p:last,b:cur.b,s:cur.s});if(bars.length>120)bars.shift();
  const tps=cur.n;cur={b:0,s:0,n:0};
  if(bars.length<WARM){$('#pb').style.width=(bars.length/WARM*100)+'%';setState(`Collecte des prix ${bars.length}/${WARM} s`,'wait');return}
@@ -120,63 +142,64 @@ function tick(){
  const L=liveScore();
  $('#mt').innerHTML=[-3,-2,-1,0,1,2,3].map(v=>`<b style="${L.sc===v?'background:'+(v>0?'#1fbf75':v<0?'#f04452':'#8b98a5'):''}"></b>`).join('');
  if(active){setState(`Signal en cours · résultat dans ${Math.max(0,Math.ceil((active.t+(DELAY+HOR)*1000-Date.now())/1000))} s`,'on');return}
- setState(`Analyse en direct · ${tps} trades/s · ${last.toFixed(3)}`,'on');
+ setState(`Analyse en direct · ${tps} ticks/s · ${last.toFixed(AS[A].d)}`,'on');
  $('#sc').className='card';
  $('#sg').innerHTML=`<div class="t" style="color:#9aa7b4;font-size:17px">🔍 ANALYSE…<small>score ${L.sc>0?'+':''}${L.sc} · flux ${L.imb>0?'acheteur':'vendeur'} ${Math.abs(L.imb*100).toFixed(0)} %</small></div>`;
  if(Math.abs(L.sc)===3&&Date.now()>cool)fire(L.sc>0?1:-1);
 }
 function fire(d){
- const a=active={d,t:Date.now(),entry:0};cool=Date.now()+(DELAY+HOR+3)*1000;
+ const a=active={d,t:Date.now(),entry:0,id:A},v=verdict(),ok=v.k==='ok';cool=Date.now()+(DELAY+HOR+3)*1000;
  $('#sc').className='card '+(d>0?'up':'dn');
- $('#sg').innerHTML=`<span style="color:${d>0?'#1fbf75':'#f04452'};display:flex;${d<0?'transform:rotate(180deg)':''}">${ARROW}</span><div class="t">${d>0?'ACHETER<small>HAUT ▲ · entre maintenant</small>':'VENDRE<small>BAS ▼ · entre maintenant</small>'}</div>`;
+ $('#sg').innerHTML=`<span style="color:${d>0?'#1fbf75':'#f04452'};display:flex;opacity:${ok?1:.4};${d<0?'transform:rotate(180deg)':''}">${ARROW}</span><div class="t">${d>0?'ACHETER':'VENDRE'}<small>${ok?(d>0?'HAUT ▲ · entre maintenant':'BAS ▼ · entre maintenant'):'⛔ signal de TEST : n\'entre pas'}</small></div>`;
  timers.push(setTimeout(()=>{a.entry=last},DELAY*1000));
  timers.push(setTimeout(()=>{
-  if(a.entry&&last!==a.entry){const w=(last>a.entry)===(d>0);ST.n++;if(w)ST.w++;ST.h.push(w?1:0);if(ST.h.length>24)ST.h.shift();ls.s('st5',JSON.stringify(ST))}
+  if(a.entry&&last!==a.entry){const w=(last>a.entry)===(d>0),s=ST[a.id]||(ST[a.id]={n:0,w:0,h:[]});s.n++;if(w)s.w++;s.h.push(w?1:0);if(s.h.length>24)s.h.shift();save()}
   active=null;stats()},(DELAY+HOR)*1000));
 }
 function wilson(w,n){if(!n)return 0;const z=1.96,p=w/n;return(p+z*z/(2*n)-z*Math.sqrt((p*(1-p)+z*z/(4*n))/n))/(1+z*z/n)*100}
+function verdict(){
+ const s=S(),po=+$('#po').value||85,be=100/(1+po/100),n=s.n,r=n?s.w/n*100:0,lb=wilson(s.w,n);let k,t;
+ if(n<50){k='w';t=`Calibrage : ${n}/50 signaux. Ne trade PAS en réel avant.`}
+ else if(lb>=be){k='ok';t='✅ Avantage probable mesuré. Reste prudent (petites mises).'}
+ else if(r<be){k='no';t='⛔ Précision sous le seuil : ne trade pas, tu perdrais de l\'argent.'}
+ else{k='w';t='⚠️ Pas de preuve d\'avantage : attends plus de signaux.'}
+ return{k,t,be,n,r,lb,h:s.h}}
 function stats(){
- const po=+$('#po').value||85,be=100/(1+po/100),n=ST.n,r=n?ST.w/n*100:0,lb=wilson(ST.w,n);
- $('#sn').textContent=n;$('#sr').textContent=n?r.toFixed(1)+' %':'–';$('#sb').textContent=be.toFixed(1)+' %';$('#sl').textContent=n?lb.toFixed(1)+' %':'–';
- const v=$('#vd');
- if(n<50){v.className='verdict v-w';v.textContent=`Calibrage : ${n}/50 signaux. Ne trade PAS en réel avant.`}
- else if(lb>=be){v.className='verdict v-ok';v.textContent='✅ Avantage probable mesuré. Reste prudent (petites mises).'}
- else if(r<be){v.className='verdict v-no';v.textContent='⛔ Précision sous le seuil : ne trade pas, tu perdrais de l\'argent.'}
- else{v.className='verdict v-w';v.textContent='⚠️ Pas de preuve d\'avantage : attends plus de signaux.'}
- $('#ds').innerHTML=ST.h.map(x=>`<i style="background:${x?'#1fbf75':'#f04452'}"></i>`).join('');
+ const v=verdict();
+ $('#sn').textContent=v.n;$('#sr').textContent=v.n?v.r.toFixed(1)+' %':'–';$('#sb').textContent=v.be.toFixed(1)+' %';$('#sl').textContent=v.n?v.lb.toFixed(1)+' %':'–';
+ const e=$('#vd');e.className='verdict '+(v.k==='ok'?'v-ok':v.k==='no'?'v-no':'v-w');e.textContent=v.t;
+ $('#ds').innerHTML=v.h.map(x=>`<i style="background:${x?'#1fbf75':'#f04452'}"></i>`).join('');
 }
 $('#po').onchange=stats;
-$('#rs').onclick=()=>{if(confirm('Remettre les statistiques à zéro ?')){ST={n:0,w:0,h:[]};ls.s('st5',JSON.stringify(ST));stats()}};
-$('#go5').onclick=()=>{
- const b=$('#go5');
- if(run){run=false;try{ws.close()}catch(e){}clearInterval(tk);timers.forEach(clearTimeout);timers=[];active=null;
-  b.textContent='▶ SCAN';b.classList.remove('stop');setState('Arrêté','');$('#sc').className='card';$('#sg').innerHTML='<div class="t" style="color:#8b98a5;font-size:15px">Appuie sur SCAN</div>';return}
- run=true;bars=[];cur={b:0,s:0,n:0};last=0;b.textContent='■ STOP';b.classList.add('stop');setState('Connexion…','wait');
+$('#rs').onclick=()=>{if(confirm('Remettre à zéro les stats de '+AS[A].n+' ?')){ST[A]={n:0,w:0,h:[]};save();stats()}};
+function stopLive(){run=false;try{ws.close()}catch(e){}clearInterval(tk);timers.forEach(clearTimeout);timers=[];active=null;const b=$('#go5');b.textContent='▶ SCAN';b.classList.remove('stop');setState('Arrêté','');idle()}
+function startLive(){
+ const a=AS[A];
+ if(a.src==='fh'&&!$('#fk').value.trim()){$('#kb').open=true;setState('Colle ta clé Finnhub (gratuite) ci-dessous','wait');return}
+ run=true;bars=[];cur={b:0,s:0,n:0};last=0;lastT=0;prevP=0;prevSide=0;fhErr='';t0=Date.now();
+ const b=$('#go5');b.textContent='■ STOP';b.classList.add('stop');setState('Connexion…','wait');
  $('#sg').innerHTML='<div class="t" style="color:#f0b429;font-size:15px">⏳ Préparation…</div>';
  connect(0);tk=setInterval(tick,1000);
-};
-stats();
+}
+$('#go5').onclick=()=>run?stopLive():startLive();
+chips();stats();
 
 // ---------- FOREX 1 min ----------
-const PAIRS=['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','USD/CHF','EUR/JPY'];
+const PAIRS=['EUR/USD'];
 async function jget(u){const c=new AbortController(),t=setTimeout(()=>c.abort(),15000);try{const r=await fetch(u,{signal:c.signal});return await r.json()}finally{clearTimeout(t)}}
 const closed=()=>{const d=new Date(),w=d.getUTCDay(),h=d.getUTCHours();return w===6||(w===5&&h>=22)||(w===0&&h<22)};
-async function sol(out){
- for(const h of ['https://data-api.binance.vision','https://api.binance.com']){
-  try{const j=await jget(h+'/api/v3/klines?symbol=SOLUSDT&interval=1m&limit=120');
-   if(Array.isArray(j)&&j.length>=55){out.push({p:'SOL/USDT',...score(j.map(x=>+x[4]))});return}}catch(e){}}}
 async function scan(){
  const key=$('#key').value.trim();if(!key)$('#kb').open=true;else ls.s('tdk',key);
  const b=$('#scan');b.disabled=true;msg('');
- const out=[];let err='',last='',done=0;const tot=PAIRS.length+1;
+ const out=[];let err='',last='',done=0;const tot=PAIRS.length;
  const prog=()=>{b.textContent=`Analyse ${done}/${tot}…`;$('#list').innerHTML=`<div class="bar"><i style="width:${done/tot*100}%"></i></div>`+out.map(row).join('')};
  prog();
- await Promise.all([sol(out).then(()=>{done++;prog()}),...(key?PAIRS:[]).map(async p=>{
+ await Promise.all((key?PAIRS:[]).map(async p=>{
   try{const j=await jget(`https://api.twelvedata.com/time_series?symbol=${p}&interval=1min&outputsize=120&apikey=${key}`);
    if(j.values&&j.values.length>=55){out.push({p,...score(j.values.slice().reverse().map(x=>+x.close))});last=j.values[0].datetime}
    else err=j.code===429?'Limite atteinte : attends 1 minute.':(j.message||'Données indisponibles');
   }catch(e){err='Connexion impossible (réseau, VPN ou bloqueur de pub ?)'}
-  done++;prog()})]);
+  done++;prog()}));
  out.sort((a,b)=>Math.abs(b.s)-Math.abs(a.s));
  $('#list').innerHTML=out.map(row).join('');
  const age=last?(Date.now()-new Date(last.replace(' ','T')+'Z'))/60000:0;
