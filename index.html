@@ -176,13 +176,15 @@ async function runScan(){
  if(daily)jobs.push(loadFX());
  if(key&&daily)jobs.push(loadTD(key));
  if(key&&!daily)jobs.push(loadFXintra(key,tf));
- const res=await Promise.allSettled(jobs);
+ const res=await Promise.allSettled(jobs.map(j=>j.finally(draw)));
  const wk=[0,6].includes(new Date().getUTCDay());
  $('#st').textContent=`${rows.length} actifs analysés (${tf}) · ${new Date().toLocaleTimeString('fr')}`+(res.some(x=>x.status==='rejected')?' · ⚠️ une source indisponible':'')+(!daily&&!key?' · forex intraday : ajoute une clé Twelve Data':'')+(wk&&key?' · ⚠️ forex fermé le week-end : données de vendredi':'')+(fxErr?' · ❌ Twelve Data : '+fxErr:'')+(key&&!daily&&$('#auto').checked&&+$('#fr').value<300?` · ⚠️ ~${Math.round(3600/+$('#fr').value*$('#np').value)} requêtes/h (limite gratuite : 800/jour)`:'');
  draw();alertNew();
 }
+let scanT=0;
 $('#go').onclick=async()=>{
- if(busy)return;busy=true;
+ if(busy&&Date.now()-scanT<120000){$('#st').textContent='⏳ Analyse déjà en cours, patiente…';return}
+ busy=true;scanT=Date.now();
  try{await runScan()}catch(e){$('#st').textContent='Erreur : '+e.message}
  finally{busy=false;draw()}
 };
