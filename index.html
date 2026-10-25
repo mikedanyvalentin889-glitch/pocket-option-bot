@@ -40,6 +40,7 @@ small,.mut{color:var(--mut)}
   <span id="cats"></span>
   <select id="tf" title="Intervalle des bougies"><option value="1m">Bougies 1 min</option><option value="5m">5 min</option><option value="15m">15 min</option><option value="1h">1 heure</option><option value="1d" selected>1 jour</option></select>
   <select id="flt"><option value="all">Tous signaux</option><option value="buy">Acheter</option><option value="sell">Vendre</option></select>
+  <label title="Actualise tout seul et envoie une notification pour les nouveaux signaux forts"><input type="checkbox" id="auto"> Auto + alertes</label>
   <span class="mut" id="st"></span>
 </div>
 <div class="bar">
@@ -148,6 +149,7 @@ $('#go').onclick=async()=>{
  if(!daily)$('#st').textContent='Intraday : crypto seulement (pas de source gratuite fiable pour le forex en minutes)';
  else if(!rows.length)$('#st').textContent='Aucune donnée reçue';
  $('#st').textContent=`${rows.length} actifs analysés (${tf}) · ${new Date().toLocaleTimeString('fr')}`+(daily?'':' · intraday = crypto seulement');busy=false;draw();
+ if(typeof alertNew==='function')alertNew();
 };
 
 // ---------- Affichage ----------
@@ -179,6 +181,35 @@ function chart(r){
  x.fillStyle='#8b98a5';x.font='11px sans-serif';x.fillText('— prix  — SMA20  — SMA50 · '+r.dates.at(-N)+' → '+r.dates.at(-1),10,12);
 }
 draw();
+
+// ---------- Auto + alertes ----------
+let timer=null,prevSig=null;
+const EVERY={'1m':60,'5m':300,'15m':900,'1h':1800,'1d':3600};
+function setupAuto(){
+ clearInterval(timer);timer=null;
+ if(!$('#auto').checked)return;
+ timer=setInterval(()=>$('#go').click(),EVERY[$('#tf').value]*1000);
+}
+$('#auto').onchange=async()=>{
+ if($('#auto').checked){
+  prevSig=null;
+  try{if('Notification' in window&&Notification.permission==='default')await Notification.requestPermission()}catch(e){}
+  $('#go').click();
+ }
+ setupAuto();
+};
+$('#tf').onchange=()=>{prevSig=null;setupAuto()};
+function alertNew(){
+ const cur={};rows.forEach(r=>cur[r.n]=Math.abs(r.s)>=3?r.sg:'neu');
+ if(prevSig&&$('#auto').checked){
+  rows.forEach(r=>{
+   if(cur[r.n]!=='neu'&&prevSig[r.n]!==cur[r.n]){
+    try{if(Notification.permission==='granted')new Notification(`${lab[r.sg]} ${r.n}`,{body:`Score ${r.s>0?'+':''}${r.s} · prix ${fmt(r.p)} · RSI ${r.r.toFixed(0)}`})}catch(e){}
+   }
+  });
+ }
+ prevSig=cur;
+}
 
 // ---------- Journal ----------
 let J=[];
