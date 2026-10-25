@@ -158,11 +158,12 @@ async function loadFXintra(key,tf){
   $('#st').textContent=`Forex ${tf} : ${i+1}/${FXM.length}…`;
   try{const j=await jget([`https://api.twelvedata.com/time_series?symbol=${FXM[i]}&interval=${TDI[tf]}&outputsize=200&apikey=${key}`]);
    if(j.values){const v=j.values.slice().reverse();const r=analyse(FXM[i],'Forex',v.map(x=>+x.close),v.map(x=>x.datetime.slice(0,16)));if(r){rows.push(r);draw()}}
-   else if(j.code===429){await new Promise(r=>setTimeout(r,62000));i--}
-   else if(j.code===401||j.code===400){$('#st').textContent='Clé Twelve Data invalide';return}
-  }catch(e){}
+   else if(j.code===429){$('#st').textContent='Limite Twelve Data atteinte, pause 1 min…';await new Promise(r=>setTimeout(r,62000));i--}
+   else{fxErr=j.message||('erreur '+j.code);if(j.code===401||j.code===400)return}
+  }catch(e){fxErr='connexion bloquée (réseau, VPN ou bloqueur de pub ?)'}
  }
 }
+let fxErr='';
 $('#go').onclick=async()=>{
  if(busy)return;busy=true;rows=[];draw();$('#det').style.display='none';
  $('#st').textContent='Chargement…';
@@ -172,9 +173,9 @@ $('#go').onclick=async()=>{
  draw();
  const key=$('#key').value.trim();
  if(key&&daily)await loadTD(key);
- if(key&&!daily)await loadFXintra(key,tf);
+ fxErr='';if(key&&!daily)await loadFXintra(key,tf);
  const wk=[0,6].includes(new Date().getUTCDay());
- $('#st').textContent=`${rows.length} actifs analysés (${tf}) · ${new Date().toLocaleTimeString('fr')}`+(!daily&&!key?' · forex intraday : ajoute une clé Twelve Data':'')+(wk&&key?' · ⚠️ forex fermé le week-end : données de vendredi':'');busy=false;draw();
+ $('#st').textContent=`${rows.length} actifs analysés (${tf}) · ${new Date().toLocaleTimeString('fr')}`+(!daily&&!key?' · forex intraday : ajoute une clé Twelve Data':'')+(wk&&key?' · ⚠️ forex fermé le week-end : données de vendredi':'')+(fxErr?' · ❌ Twelve Data : '+fxErr:'');busy=false;draw();
  if(typeof alertNew==='function')alertNew();
 };
 
