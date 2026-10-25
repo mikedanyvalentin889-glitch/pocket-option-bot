@@ -109,10 +109,10 @@ function score(c){
 const fmt=v=>v>=50?v.toFixed(3):v.toFixed(5);
 
 // ---------- LIVE 3 s + bougies 1 min ----------
-const AS={SOL:{n:'SOL/USDT',src:'bn',sym:'solusdt',d:3,td:''},EURUSD:{n:'EUR/USD',src:'fh',sym:'OANDA:EUR_USD',d:5,td:'EUR/USD'},USDJPY:{n:'USD/JPY',src:'fh',sym:'OANDA:USD_JPY',d:3,td:'USD/JPY'},AAPL:{n:'Apple',src:'fh',sym:'AAPL',d:2,td:'AAPL'}};
+const AS={SOL:{n:'SOL/USDT',src:'bn',sym:'solusdt',d:3,td:'',lo:2,hi:3000},EURUSD:{n:'EUR/USD',src:'fh',sym:'OANDA:EUR_USD',d:5,td:'EUR/USD',lo:.5,hi:2},USDJPY:{n:'USD/JPY',src:'fh',sym:'OANDA:USD_JPY',d:3,td:'USD/JPY',lo:50,hi:300},AAPL:{n:'Apple',src:'fh',sym:'AAPL',d:2,td:'AAPL',lo:20,hi:2000}};
 const HOR=3,WARM=20,NAMES=['Tendance 1 min (EMA 9/21)','Couleur de la bougie en cours','Micro-tendance 1 s','Élan sur 3 s','Flux acheteur / vendeur'];
 const DEL=()=>Math.max(0,Math.min(5,+$('#dl').value||0));
-let A='SOL',ws=null,run=false,bars=[],cur={b:0,s:0,n:0},last=0,lastT=0,prevP=0,prevSide=0,t0=0,tk=null,active=null,cool=0,timers=[],fhErr='';
+let A='SOL',cid=0,bad=0,ws=null,run=false,bars=[],cur={b:0,s:0,n:0},last=0,lastT=0,prevP=0,prevSide=0,t0=0,tk=null,active=null,cool=0,timers=[],fhErr='';
 let candles=[],off=0,sec=0,pxs=[],pend=[],CS=NAMES.map(()=>({n:0,w:0}));
 let ST={};try{ST=JSON.parse(ls.g('st7')||'{}')||{}}catch(e){}
 const S=()=>ST[A]||(ST[A]={n:0,w:0,h:[]});
@@ -120,8 +120,9 @@ const save=()=>ls.s('st7',JSON.stringify(ST));
 function chips(){$('#ch').innerHTML=Object.keys(AS).map(k=>`<button data-k="${k}" class="${k===A?'on':''}">${AS[k].n}</button>`).join('');$('#an').textContent=AS[A].n}
 $('#ch').onclick=e=>{const k=e.target.dataset.k;if(!k||k===A)return;const was=run;if(was)stopLive();A=k;chips();stats();idle();if(was)startLive()};
 function setState(t,c){$('#stt').textContent=t;$('#dt').className='dot '+(c||'')}
-function idle(){$('#sc').className='card';$('#sg').innerHTML='<div class="t" style="color:#8b98a5;font-size:15px">Appuie sur SCAN</div>';$('#mt').innerHTML='';$('#pb').style.width='0'}
+function idle(){$('#sc').className='card';$('#sg').innerHTML='<div class="t" style="color:#8b98a5;font-size:15px">Appuie sur SCAN</div>';$('#mt').innerHTML='';$('#pb').style.width='0';candles=[];last=0;bad=0;$('#ct').textContent='';$('#cp').innerHTML='';drawC()}
 function onTick(p,q,side,ts){
+ if(!(p>=AS[A].lo&&p<=AS[A].hi)){bad=p;return}
  last=p;lastT=Date.now();ts=ts||lastT;off=off?off*.9+(ts-lastT)*.1:ts-lastT;
  const m=Math.floor(ts/60000)*60000,k=candles.at(-1);
  if(!k||m>k.t){candles.push({t:m,o:p,h:p,l:p,c:p});if(candles.length>90)candles.shift()}
@@ -136,16 +137,16 @@ async function seed(){
  }catch(e){}
 }
 function connect(u){
- const a=AS[A];let url;
+ const a=AS[A],my=++cid;let url;
  if(a.src==='bn')url=['wss://stream.binance.com:9443/ws/','wss://data-stream.binance.vision/ws/'][u%2]+a.sym+'@trade';
  else url='wss://ws.finnhub.io?token='+encodeURIComponent($('#fk').value.trim());
  ws=new WebSocket(url);
  ws.onopen=()=>{if(a.src==='fh')ws.send(JSON.stringify({type:'subscribe',symbol:a.sym}));setState('Connecté · en attente des prix…','wait')};
- ws.onmessage=e=>{const d=JSON.parse(e.data);
+ ws.onmessage=e=>{if(my!==cid)return;const d=JSON.parse(e.data);
   if(a.src==='bn')onTick(+d.p,+d.q,d.m?-1:1,d.T);
   else if(d.type==='trade')d.data.forEach(x=>{if(x.s===a.sym)onTick(+x.p,+x.v||1,0,x.t)});
   else if(d.type==='error')fhErr=d.msg||'erreur'};
- ws.onclose=()=>{if(run){setState('Reconnexion…','wait');setTimeout(()=>run&&connect(u+1),2500)}};
+ ws.onclose=()=>{if(run&&my===cid){setState('Reconnexion…','wait');setTimeout(()=>run&&my===cid&&connect(u+1),2500)}};
  ws.onerror=()=>{try{ws.close()}catch(e){}};
 }
 function comps(){
@@ -163,13 +164,14 @@ function drawC(){
  L.forEach((c,i)=>{const cx=i*w+w/2,col=c.c>=c.o?'#1fbf75':'#f04452';x.strokeStyle=col;x.fillStyle=col;x.beginPath();x.moveTo(cx,Y(c.h));x.lineTo(cx,Y(c.l));x.stroke();const t=Y(Math.max(c.o,c.c)),b=Y(Math.min(c.o,c.c));x.fillRect(cx-w*.3,t,w*.6,Math.max(1,b-t))})}
 function tick(){
  const age=Date.now()-lastT;
+ if(!last&&bad){setState(`⚠️ Prix inattendu (${bad}) pour ${AS[A].n} : flux ignoré`,'wait');return}
  if(!last||age>10000){
   const x=last?`Aucun prix depuis ${Math.round(age/1000)} s`:(Date.now()-t0>10000?'Aucun prix reçu':'En attente du premier prix…');
   setState('⚠️ '+x+' · marché fermé ?'+(fhErr?' ('+fhErr+')':''),'wait');return}
  sec++;pxs[sec]=last;bars.push({p:last,b:cur.b,s:cur.s,n:cur.n});if(bars.length>120)bars.shift();
  const tps=cur.n;cur={b:0,s:0,n:0};
  const k=candles.at(-1),rem=Math.ceil(60-((Date.now()+off)/1000)%60),d=DEL(),dp=AS[A].d;
- if(k){$('#ct').textContent=`· O ${k.o.toFixed(dp)} H ${k.h.toFixed(dp)} L ${k.l.toFixed(dp)} C ${k.c.toFixed(dp)} · ⏱ ${rem} s`;drawC()}
+ if(k){$('#ct').textContent=`· ${AS[A].n} · O ${k.o.toFixed(dp)} H ${k.h.toFixed(dp)} L ${k.l.toFixed(dp)} C ${k.c.toFixed(dp)} · ⏱ ${rem} s`;drawC()}
  while(pend.length&&pend[0].s+d+HOR<=sec){const q=pend.shift(),y=Math.sign(pxs[q.s+d+HOR]-pxs[q.s+d]);
   if(y)q.c.forEach((v,i)=>{if(v){CS[i].n=CS[i].n*.998+1;CS[i].w=CS[i].w*.998+(v===y?1:0)}})}
  if(bars.length<WARM){$('#pb').style.width=(bars.length/WARM*100)+'%';setState(`Collecte des prix ${bars.length}/${WARM} s`,'wait');return}
@@ -179,7 +181,7 @@ function tick(){
  $('#pb').style.width=active?Math.min(100,(Date.now()-active.t)/((d+HOR)*10))+'%':'100%';
  $('#mt').innerHTML=[-3,-2,-1,0,1,2,3].map(v=>`<b style="${Math.max(-3,Math.min(3,sc))===v?'background:'+(v>0?'#1fbf75':v<0?'#f04452':'#8b98a5'):''}"></b>`).join('');
  if(active){setState(`Signal en cours · résultat dans ${Math.max(0,Math.ceil((active.t+(d+HOR)*1000-Date.now())/1000))} s`,'on');return}
- setState(`Analyse en direct · ${tps} ticks/s · ${last.toFixed(dp)}`,'on');
+ setState(`Analyse ${AS[A].n} · ${tps} ticks/s · ${last.toFixed(dp)}`,'on');
  $('#sc').className='card';
  const msgs=nact===0?(sec<120?`calibrage des indicateurs… ${sec}/120 s`:'indicateurs non prouvés : les directions sont des paris'):`${nact}/5 indicateurs fiables · bougie ${k&&k.c>=k.o?'verte':'rouge'}`;
  $('#sg').innerHTML=`<div class="t" style="color:#9aa7b4;font-size:17px">🔍 ANALYSE…<small>${msgs}</small></div>`;
@@ -212,7 +214,7 @@ function stats(){
 }
 $('#po').onchange=stats;
 $('#rs').onclick=()=>{if(confirm('Remettre à zéro les stats de '+AS[A].n+' ?')){ST[A]={n:0,w:0,h:[]};save();stats()}};
-function stopLive(){run=false;try{ws.close()}catch(e){}clearInterval(tk);timers.forEach(clearTimeout);timers=[];active=null;const b=$('#go5');b.textContent='▶ SCAN';b.classList.remove('stop');setState('Arrêté','');idle()}
+function stopLive(){run=false;cid++;try{ws.close()}catch(e){}clearInterval(tk);timers.forEach(clearTimeout);timers=[];active=null;const b=$('#go5');b.textContent='▶ SCAN';b.classList.remove('stop');setState('Arrêté','');idle()}
 async function startLive(){
  const a=AS[A];
  if(a.src==='fh'&&!$('#fk').value.trim()){$('#kb').open=true;setState('Colle ta clé Finnhub (gratuite) ci-dessous','wait');return}
