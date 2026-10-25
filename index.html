@@ -181,15 +181,16 @@ function tick(){
  if(active){setState(`Signal en cours · résultat dans ${Math.max(0,Math.ceil((active.t+(d+HOR)*1000-Date.now())/1000))} s`,'on');return}
  setState(`Analyse en direct · ${tps} ticks/s · ${last.toFixed(dp)}`,'on');
  $('#sc').className='card';
- const msgs=nact===0?(sec<120?`calibrage des indicateurs… ${sec}/120 s`:'aucun indicateur fiable : pas de signal'):`${nact}/5 indicateurs fiables · bougie ${k&&k.c>=k.o?'verte':'rouge'}`;
+ const msgs=nact===0?(sec<120?`calibrage des indicateurs… ${sec}/120 s`:'indicateurs non prouvés : les directions sont des paris'):`${nact}/5 indicateurs fiables · bougie ${k&&k.c>=k.o?'verte':'rouge'}`;
  $('#sg').innerHTML=`<div class="t" style="color:#9aa7b4;font-size:17px">🔍 ANALYSE…<small>${msgs}</small></div>`;
  const R=candles.length>15?rsi(candles.map(x=>x.c)):50,tr=bars.slice(-10).reduce((a,b)=>a+b.n,0)/10;
- if(na>=2&&Math.abs(sc)===na&&tr>=1&&!(sc>0&&R>75)&&!(sc<0&&R<25)&&Date.now()>cool)fire(sc>0?1:-1);
+ const good=na>=2&&Math.abs(sc)===na&&tr>=1&&!(sc>0&&R>75)&&!(sc<0&&R<25),all=C.o.reduce((a,b)=>a+b,0);
+ if(Date.now()>cool){if(good)fire(sc>0?1:-1,true);else if(Math.abs(all)>=2)fire(all>0?1:-1,false)}
 }
-function fire(dir){
+function fire(dir,good){
  const d=DEL(),a=active={d:dir,t:Date.now(),entry:0,id:A},v=verdict(),ok=v.k==='ok';cool=Date.now()+(d+HOR+3)*1000;
  $('#sc').className='card '+(dir>0?'up':'dn');
- $('#sg').innerHTML=`<span style="color:${dir>0?'#1fbf75':'#f04452'};display:flex;opacity:${ok?1:.4};${dir<0?'transform:rotate(180deg)':''}">${ARROW}</span><div class="t">${dir>0?'ACHETER':'VENDRE'}<small>${ok?(dir>0?'HAUT ▲':'BAS ▼')+' · entre maintenant · '+HOR+' s':'⛔ signal de TEST : n\'entre pas'}</small></div>`;
+ $('#sg').innerHTML=`<span style="color:${dir>0?'#1fbf75':'#f04452'};display:flex;opacity:${good&&ok?1:.8};${dir<0?'transform:rotate(180deg)':''}">${ARROW}</span><div class="t">${dir>0?'ACHETER':'VENDRE'}<small>${(dir>0?'HAUT ▲':'BAS ▼')+' · '+(good&&ok?'✅ signal fiable':good?'⚠️ signal non vérifié':'⚠️ PARI faible confiance')+' · '+HOR+' s'}</small></div>`;
  timers.push(setTimeout(()=>{a.entry=last},d*1000));
  timers.push(setTimeout(()=>{
   if(a.entry&&last!==a.entry){const w=(last>a.entry)===(dir>0),s=ST[a.id]||(ST[a.id]={n:0,w:0,h:[]});s.n++;if(w)s.w++;s.h.push(w?1:0);if(s.h.length>24)s.h.shift();save()}
