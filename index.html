@@ -41,6 +41,8 @@ small,.mut{color:var(--mut)}
   <select id="tf" title="Intervalle des bougies"><option value="1m">Bougies 1 min</option><option value="5m">5 min</option><option value="15m">15 min</option><option value="1h">1 heure</option><option value="1d" selected>1 jour</option></select>
   <select id="flt"><option value="all">Tous signaux</option><option value="buy">Acheter</option><option value="sell">Vendre</option></select>
   <label title="Actualise tout seul et envoie une notification pour les nouveaux signaux forts"><input type="checkbox" id="auto"> Auto + alertes</label>
+  <select id="fr" title="Fréquence de l'actualisation auto"><option value="60">Toutes les 1 min</option><option value="120">2 min</option><option value="300">5 min</option></select>
+  <select id="np" title="Nombre de paires forex en intraday (moins = moins de quota)"><option value="3">3 paires</option><option value="7" selected>7 paires</option></select>
   <span class="mut" id="st"></span>
 </div>
 <div class="bar">
@@ -78,6 +80,7 @@ const CUR=['USD','GBP','JPY','CHF','CAD','AUD','NZD'];
 const FX=[['EUR','USD'],['GBP','USD'],['USD','JPY'],['USD','CHF'],['USD','CAD'],['AUD','USD'],['NZD','USD'],['EUR','GBP'],['EUR','JPY'],['EUR','CHF'],['GBP','JPY'],['AUD','JPY'],['EUR','AUD'],['EUR','CAD'],['GBP','CHF']];
 const CR=['BTC','ETH','BNB','SOL','XRP','ADA','DOGE','LTC','LINK','AVAX'];
 const TD=[['SPY','S&P 500 (ETF)'],['QQQ','Nasdaq 100 (ETF)'],['DIA','Dow Jones (ETF)'],['GLD','Or (ETF)'],['SLV','Argent (ETF)'],['USO','Pétrole (ETF)'],['AAPL','Apple'],['TSLA','Tesla'],['NVDA','Nvidia'],['MSFT','Microsoft']];
+const put=r=>{const i=rows.findIndex(x=>x.n===r.n);i>=0?rows[i]=r:rows.push(r)};
 let rows=[],cat='all',sortK='s',sortD=-1,busy=false;
 const cats=['all','Forex','Crypto','Marchés'];
 $('#cats').innerHTML=cats.map(c=>`<button data-c="${c}" class="${c==='all'?'on':''}">${c==='all'?'Tous':c}</button>`).join(' ');
@@ -134,18 +137,18 @@ async function loadFX(){
  const rate=(d,c)=>c==='EUR'?1:j.rates[d][c];
  FX.forEach(([a,b])=>{
   const cl=dates.map(d=>rate(d,b)/rate(d,a));
-  const r=analyse(`${a}/${b}`,'Forex',cl,dates);if(r)rows.push(r)});
+  const r=analyse(`${a}/${b}`,'Forex',cl,dates);if(r)put(r)});
 }
 async function loadCrypto(tf){
  await Promise.all(CR.map(async c=>{
   try{const j=await jget([`https://api.binance.com/api/v3/klines?symbol=${c}USDT&interval=${tf}&limit=250`,`https://data-api.binance.vision/api/v3/klines?symbol=${c}USDT&interval=${tf}&limit=250`]);
-   const r=analyse(`${c}/USDT`,'Crypto',j.map(k=>+k[4]),j.map(k=>new Date(k[0]).toISOString().slice(0,tf==='1d'?10:16).replace('T',' ')));if(r)rows.push(r)}catch(e){}}))
+   const r=analyse(`${c}/USDT`,'Crypto',j.map(k=>+k[4]),j.map(k=>new Date(k[0]).toISOString().slice(0,tf==='1d'?10:16).replace('T',' ')));if(r)put(r)}catch(e){}}))
 }
 async function loadTD(key){
  for(let i=0;i<TD.length;i++){
   $('#st').textContent=`Marchés ${i+1}/${TD.length} (limite 8/min)…`;
   try{const j=await jget([`https://api.twelvedata.com/time_series?symbol=${TD[i][0]}&interval=1day&outputsize=200&apikey=${key}`]);
-   if(j.values){const v=j.values.slice().reverse();const r=analyse(TD[i][1],'Marchés',v.map(x=>+x.close),v.map(x=>x.datetime));if(r){rows.push(r);draw()}}
+   if(j.values){const v=j.values.slice().reverse();const r=analyse(TD[i][1],'Marchés',v.map(x=>+x.close),v.map(x=>x.datetime));if(r){put(r);draw()}}
    else if(j.code===429||/credits/i.test(j.message||'')){await new Promise(r=>setTimeout(r,62000));i--}
   }catch(e){}
   if((i+1)%8===0)await new Promise(r=>setTimeout(r,62000));
@@ -154,10 +157,11 @@ async function loadTD(key){
 const FXM=['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','USD/CHF','EUR/JPY'];
 const TDI={'1m':'1min','5m':'5min','15m':'15min','1h':'1h'};
 async function loadFXintra(key,tf){
- for(let i=0;i<FXM.length;i++){
-  $('#st').textContent=`Forex ${tf} : ${i+1}/${FXM.length}…`;
-  try{const j=await jget([`https://api.twelvedata.com/time_series?symbol=${FXM[i]}&interval=${TDI[tf]}&outputsize=200&apikey=${key}`]);
-   if(j.values){const v=j.values.slice().reverse();const r=analyse(FXM[i],'Forex',v.map(x=>+x.close),v.map(x=>x.datetime.slice(0,16)));if(r){rows.push(r);draw()}}
+ const L=FXM.slice(0,+$('#np').value);
+ for(let i=0;i<L.length;i++){
+  $('#st').textContent=`Forex ${tf} : ${i+1}/${L.length}…`;
+  try{const j=await jget([`https://api.twelvedata.com/time_series?symbol=${L[i]}&interval=${TDI[tf]}&outputsize=200&apikey=${key}`]);
+   if(j.values){const v=j.values.slice().reverse();const r=analyse(L[i],'Forex',v.map(x=>+x.close),v.map(x=>x.datetime.slice(0,16)));if(r){put(r);draw()}}
    else if(j.code===429){$('#st').textContent='Limite Twelve Data atteinte, pause 1 min…';await new Promise(r=>setTimeout(r,62000));i--}
    else{fxErr=j.message||('erreur '+j.code);if(j.code===401||j.code===400)return}
   }catch(e){fxErr='connexion bloquée (réseau, VPN ou bloqueur de pub ?)'}
@@ -165,7 +169,7 @@ async function loadFXintra(key,tf){
 }
 let fxErr='';
 $('#go').onclick=async()=>{
- if(busy)return;busy=true;rows=[];draw();$('#det').style.display='none';
+ if(busy)return;busy=true;if(!($('#auto').checked&&rows.length)){rows=[];draw();$('#det').style.display='none'}
  $('#st').textContent='Chargement…';
  const tf=$('#tf').value,daily=tf==='1d';
  const res=await Promise.allSettled(daily?[loadFX(),loadCrypto(tf)]:[loadCrypto(tf)]);
@@ -175,7 +179,7 @@ $('#go').onclick=async()=>{
  if(key&&daily)await loadTD(key);
  fxErr='';if(key&&!daily)await loadFXintra(key,tf);
  const wk=[0,6].includes(new Date().getUTCDay());
- $('#st').textContent=`${rows.length} actifs analysés (${tf}) · ${new Date().toLocaleTimeString('fr')}`+(!daily&&!key?' · forex intraday : ajoute une clé Twelve Data':'')+(wk&&key?' · ⚠️ forex fermé le week-end : données de vendredi':'')+(fxErr?' · ❌ Twelve Data : '+fxErr:'');busy=false;draw();
+ $('#st').textContent=`${rows.length} actifs analysés (${tf}) · ${new Date().toLocaleTimeString('fr')}`+(!daily&&!key?' · forex intraday : ajoute une clé Twelve Data':'')+(wk&&key?' · ⚠️ forex fermé le week-end : données de vendredi':'')+(fxErr?' · ❌ Twelve Data : '+fxErr:'')+(key&&!daily&&$('#auto').checked&&+$('#fr').value<300?` · ⚠️ ~${Math.round(3600/+$('#fr').value*$('#np').value)} requêtes/h (limite gratuite : 800/jour)`:'');busy=false;draw();
  if(typeof alertNew==='function')alertNew();
 };
 
@@ -215,8 +219,7 @@ const EVERY={'1m':60,'5m':300,'15m':900,'1h':1800,'1d':3600};
 function setupAuto(){
  clearInterval(timer);timer=null;
  if(!$('#auto').checked)return;
- const tf=$('#tf').value,hasKey=!!$('#key').value.trim();
- timer=setInterval(()=>$('#go').click(),Math.max(EVERY[tf],hasKey&&tf!=='1d'?300:0)*1000);
+ timer=setInterval(()=>$('#go').click(),+$('#fr').value*1000);
 }
 $('#auto').onchange=async()=>{
  if($('#auto').checked){
@@ -226,7 +229,8 @@ $('#auto').onchange=async()=>{
  }
  setupAuto();
 };
-$('#tf').onchange=()=>{prevSig=null;setupAuto()};
+$('#tf').onchange=()=>{prevSig=null;rows=[];draw();setupAuto()};
+$('#fr').onchange=setupAuto;
 function alertNew(){
  const cur={};rows.forEach(r=>cur[r.n]=Math.abs(r.s)>=3?r.sg:'neu');
  if(prevSig&&$('#auto').checked){
