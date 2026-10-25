@@ -50,7 +50,7 @@ small,.mut{color:var(--mut)}
 </div>
 
 <div class="wrap"><table>
-<thead><tr><th data-k="n">Actif</th><th data-k="c">Catégorie</th><th data-k="p">Prix</th><th data-k="d">Var. bougie</th><th data-k="r">RSI</th><th data-k="s">Score</th><th data-k="sg">Signal</th></tr></thead>
+<thead><tr><th data-k="n">Actif</th><th data-k="c">Catégorie</th><th data-k="p">Prix</th><th data-k="d">Var. bougie</th><th data-k="r">RSI</th><th data-k="s">Score</th><th data-k="sg">Signal</th><th data-k="h" title="Réussite passée des signaux forts, 5 bougies plus tard (entre parenthèses : nombre de signaux testés)">Hist. 5b</th></tr></thead>
 <tbody id="tb"></tbody></table></div>
 
 <div id="det"><div id="dt" style="font-weight:700;font-size:16px"></div><canvas id="cv"></canvas><div class="g" id="gd"></div></div>
@@ -95,6 +95,19 @@ function rsi(a,n=14){if(a.length<n+1)return null;let g=0,l=0;for(let i=1;i<=n;i+
  return l===0?100:100-100/(1+g/l)}
 function macd(a){const e12=ema(a,12),e26=ema(a,26),m=e12.map((v,i)=>v-e26[i]),s=ema(m,9);return{m:m.at(-1),s:s.at(-1),h:m.at(-1)-s.at(-1)}}
 function boll(a,n=20){const w=a.slice(-n),m=w.reduce((x,y)=>x+y,0)/n,sd=Math.sqrt(w.reduce((x,y)=>x+(y-m)**2,0)/n);return{u:m+2*sd,l:m-2*sd,m,pb:sd?(a.at(-1)-(m-2*sd))/(4*sd):.5}}
+function quick(c){
+ const p=c.at(-1),s20=sma(c,20),s50=sma(c,50),R=rsi(c),M=macd(c),B=boll(c);
+ let s=(p>s50?1:-1)+(s20>s50?1:-1)+(M.h>0?1:-1);
+ if(R<30)s++;else if(R>70)s--;
+ if(B.pb<.05)s++;else if(B.pb>.95)s--;
+ return s}
+function backtest(c){
+ const H=[1,3,5],o={};H.forEach(h=>o[h]={n:0,w:0});
+ for(let i=55;i<c.length-1;i++){
+  const s=quick(c.slice(0,i+1));if(Math.abs(s)<3)continue;
+  H.forEach(h=>{if(i+h<c.length){const d=c[i+h]-c[i];if(d!==0){o[h].n++;if((d>0)===(s>0))o[h].w++}}})
+ }
+ return o}
 function analyse(name,catg,closes,dates){
  if(closes.length<55)return null;
  const p=closes.at(-1),s20=sma(closes,20),s50=sma(closes,50),R=rsi(closes),M=macd(closes),B=boll(closes);
@@ -106,7 +119,8 @@ function analyse(name,catg,closes,dates){
  if(B.pb<.05){sc++;why.push('Bas des Bollinger (+1)')}else if(B.pb>.95){sc--;why.push('Haut des Bollinger (−1)')}else why.push('Bollinger neutre (0)');
  const rets=closes.slice(-15).map((v,i,a)=>i?Math.log(v/a[i-1]):0).slice(1),vol=Math.sqrt(rets.reduce((x,y)=>x+y*y,0)/rets.length)*100;
  const sg=sc>=3?'buy':sc<=-3?'sell':'neu';
- return{n:name,c:catg,p,d:(p/closes.at(-2)-1)*100,r:R,s:sc,sg,s20,s50,M,B,vol,why,closes,dates}
+ const bt=backtest(closes),h=bt[5].n?bt[5].w/bt[5].n*100:-1;
+ return{n:name,c:catg,p,d:(p/closes.at(-2)-1)*100,r:R,s:sc,sg,s20,s50,M,B,vol,why,closes,dates,bt,h}
 }
 const fmt=v=>v>=1000?v.toLocaleString('fr',{maximumFractionDigits:2}):v>=10?v.toFixed(3):v.toFixed(5);
 
@@ -137,6 +151,18 @@ async function loadTD(key){
   if((i+1)%8===0)await new Promise(r=>setTimeout(r,62000));
  }
 }
+const FXM=['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','USD/CHF','EUR/JPY'];
+const TDI={'1m':'1min','5m':'5min','15m':'15min','1h':'1h'};
+async function loadFXintra(key,tf){
+ for(let i=0;i<FXM.length;i++){
+  $('#st').textContent=`Forex ${tf} : ${i+1}/${FXM.length}…`;
+  try{const j=await jget([`https://api.twelvedata.com/time_series?symbol=${FXM[i]}&interval=${TDI[tf]}&outputsize=200&apikey=${key}`]);
+   if(j.values){const v=j.values.slice().reverse();const r=analyse(FXM[i],'Forex',v.map(x=>+x.close),v.map(x=>x.datetime.slice(0,16)));if(r){rows.push(r);draw()}}
+   else if(j.code===429){await new Promise(r=>setTimeout(r,62000));i--}
+   else if(j.code===401||j.code===400){$('#st').textContent='Clé Twelve Data invalide';return}
+  }catch(e){}
+ }
+}
 $('#go').onclick=async()=>{
  if(busy)return;busy=true;rows=[];draw();$('#det').style.display='none';
  $('#st').textContent='Chargement…';
@@ -146,9 +172,9 @@ $('#go').onclick=async()=>{
  draw();
  const key=$('#key').value.trim();
  if(key&&daily)await loadTD(key);
- if(!daily)$('#st').textContent='Intraday : crypto seulement (pas de source gratuite fiable pour le forex en minutes)';
- else if(!rows.length)$('#st').textContent='Aucune donnée reçue';
- $('#st').textContent=`${rows.length} actifs analysés (${tf}) · ${new Date().toLocaleTimeString('fr')}`+(daily?'':' · intraday = crypto seulement');busy=false;draw();
+ if(key&&!daily)await loadFXintra(key,tf);
+ const wk=[0,6].includes(new Date().getUTCDay());
+ $('#st').textContent=`${rows.length} actifs analysés (${tf}) · ${new Date().toLocaleTimeString('fr')}`+(!daily&&!key?' · forex intraday : ajoute une clé Twelve Data':'')+(wk&&key?' · ⚠️ forex fermé le week-end : données de vendredi':'');busy=false;draw();
  if(typeof alertNew==='function')alertNew();
 };
 
@@ -158,14 +184,14 @@ function draw(){
  const f=$('#flt').value;
  let l=rows.filter(r=>(cat==='all'||r.c===cat)&&(f==='all'||r.sg===f));
  l.sort((a,b)=>{const x=a[sortK==='sg'?'s':sortK],y=b[sortK==='sg'?'s':sortK];return (x>y?1:x<y?-1:0)*sortD});
- $('#tb').innerHTML=l.map(r=>`<tr class="r" data-n="${r.n}"><td><b>${r.n}</b></td><td class="mut">${r.c}</td><td>${fmt(r.p)}</td><td class="${r.d>=0?'up':'dn'}">${r.d>=0?'+':''}${r.d.toFixed(2)}%</td><td>${r.r.toFixed(0)}</td><td>${r.s>0?'+':''}${r.s}</td><td><span class="b ${r.sg}">${lab[r.sg]}${Math.abs(r.s)===2?' (faible)':''}</span></td></tr>`).join('')||'<tr><td colspan="7" class="mut">Cliquez sur « Analyser »</td></tr>';
+ $('#tb').innerHTML=l.map(r=>`<tr class="r" data-n="${r.n}"><td><b>${r.n}</b></td><td class="mut">${r.c}</td><td>${fmt(r.p)}</td><td class="${r.d>=0?'up':'dn'}">${r.d>=0?'+':''}${r.d.toFixed(2)}%</td><td>${r.r.toFixed(0)}</td><td>${r.s>0?'+':''}${r.s}</td><td><span class="b ${r.sg}">${lab[r.sg]}${Math.abs(r.s)===2?' (faible)':''}</span></td><td>${r.bt[5].n?r.h.toFixed(0)+'% <small>('+r.bt[5].n+')</small>':'–'}</td></tr>`).join('')||'<tr><td colspan="8" class="mut">Cliquez sur « Analyser »</td></tr>';
 }
 $('#tb').onclick=e=>{const tr=e.target.closest('tr.r');if(!tr)return;const r=rows.find(x=>x.n===tr.dataset.n);if(r)detail(r)};
 function detail(r){
  $('#det').style.display='block';
  $('#dt').innerHTML=`${r.n} <span class="b ${r.sg}">${lab[r.sg]}</span> <small>score ${r.s}</small>`;
  const g=[['Prix',fmt(r.p)],['SMA20',fmt(r.s20)],['SMA50',fmt(r.s50)],['RSI14',r.r.toFixed(1)],['MACD hist.',r.M.h.toExponential(2)],['Bollinger %B',(r.B.pb*100).toFixed(0)+'%'],['Volatilité 14j',r.vol.toFixed(2)+'%/j'],['Stop indicatif',fmt(r.sg==='sell'?r.p*(1+r.vol*2/100):r.p*(1-r.vol*2/100))+' (2×vol)']];
- $('#gd').innerHTML=g.map(x=>`<div><b>${x[0]}</b>${x[1]}</div>`).join('')+`<div style="grid-column:1/-1"><b>Détail du score</b>${r.why.join(' · ')}</div>`;
+ $('#gd').innerHTML=g.map(x=>`<div><b>${x[0]}</b>${x[1]}</div>`).join('')+`<div style="grid-column:1/-1"><b>Détail du score</b>${r.why.join(' · ')}</div>`+`<div style="grid-column:1/-1"><b>Backtest : signaux forts passés sur cet actif (${r.closes.length} bougies)</b>${[1,3,5].map(h=>{const o=r.bt[h];return o.n?`+${h} bougie${h>1?'s':''} : <b class="${o.w/o.n>=.54?'up':'dn'}">${(o.w/o.n*100).toFixed(0)}%</b> sur ${o.n} signaux`:`+${h} : pas de signal`}).join(' · ')}<br><small>Seuil pour ne pas perdre : ~54 % (payout 85 %). Moins de 30 signaux = échantillon trop petit pour conclure. Le passé ne garantit rien.</small></div>`;
  chart(r);$('#det').scrollIntoView({behavior:'smooth'});
 }
 function chart(r){
@@ -188,7 +214,8 @@ const EVERY={'1m':60,'5m':300,'15m':900,'1h':1800,'1d':3600};
 function setupAuto(){
  clearInterval(timer);timer=null;
  if(!$('#auto').checked)return;
- timer=setInterval(()=>$('#go').click(),EVERY[$('#tf').value]*1000);
+ const tf=$('#tf').value,hasKey=!!$('#key').value.trim();
+ timer=setInterval(()=>$('#go').click(),Math.max(EVERY[tf],hasKey&&tf!=='1d'?300:0)*1000);
 }
 $('#auto').onchange=async()=>{
  if($('#auto').checked){
