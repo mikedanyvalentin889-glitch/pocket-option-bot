@@ -3,285 +3,112 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Market Scanner – Forex, Crypto, Actions</title>
+<title>Scan Forex</title>
 <style>
-:root{--bg:#0f1419;--card:#1a212b;--tx:#e6edf3;--mut:#8b98a5;--bd:#2b3542;--up:#16c784;--dn:#ea3943;--ne:#f0b429;--ac:#3b82f6}
-@media (prefers-color-scheme:light){:root{--bg:#f4f6f9;--card:#fff;--tx:#14202b;--mut:#5b6b7a;--bd:#d9e0e8}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:14px;max-width:1100px;margin:auto}
-h1{font-size:20px;margin:4px 0}
-.warn{background:var(--card);border-left:4px solid var(--ne);padding:8px 12px;border-radius:6px;color:var(--mut);font-size:12.5px;margin:8px 0}
-.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
-button,select,input{background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:7px 10px;font:inherit}
-button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color:#fff}
-button.on{border-color:var(--ac);color:var(--ac)}
-.wrap{overflow-x:auto;background:var(--card);border:1px solid var(--bd);border-radius:8px}
-table{width:100%;border-collapse:collapse;min-width:640px}
-th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--bd);white-space:nowrap}
-th{color:var(--mut);font-weight:600;font-size:12px;cursor:pointer}
-tr.r{cursor:pointer}tr.r:hover{background:rgba(127,127,127,.1)}
-.b{padding:2px 8px;border-radius:10px;font-weight:700;font-size:12px}
-.buy{background:rgba(22,199,132,.18);color:var(--up)}.sell{background:rgba(234,57,67,.18);color:var(--dn)}.neu{background:rgba(240,180,41,.18);color:var(--ne)}
-.up{color:var(--up)}.dn{color:var(--dn)}
-#det{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-top:12px;display:none}
-canvas{width:100%;height:240px;display:block}
-.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:8px}
-.g div{border:1px solid var(--bd);border-radius:6px;padding:6px 8px;font-size:12.5px}
-.g b{display:block;font-size:11px;color:var(--mut);font-weight:600}
-small,.mut{color:var(--mut)}
+body{margin:0;background:#12161c;color:#e8edf2;font:14px system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+#app{width:100%;max-width:340px;margin:0 auto;padding:10px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.top b{letter-spacing:.5px}
+button,input{font:inherit;border-radius:8px;border:1px solid #2c3644;background:#1c232d;color:inherit;padding:7px 10px}
+button{cursor:pointer}
+#scan{width:100%;padding:14px;font-size:18px;font-weight:800;background:#2f6bff;border-color:#2f6bff;color:#fff;letter-spacing:1px}
+#scan:disabled{opacity:.6}
+#msg{margin:8px 0;font-size:12.5px;color:#f0b429;min-height:0}
+.row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;margin-top:6px;background:#1a2029}
+.row.up{background:rgba(31,191,117,.14)}.row.dn{background:rgba(240,68,82,.14)}
+.row svg{width:34px;height:34px;flex:none}
+.row .n{flex:1;font-weight:700;font-size:15px}
+.row .n small{display:block;font-weight:400;color:#8b98a5;font-size:11px}
+.row .l{font-weight:800;font-size:13px;text-align:right}
+.up .l{color:#1fbf75}.dn .l{color:#f04452}.ne .l{color:#8b98a5}
+.weak{opacity:.55}
+details{margin-top:10px;font-size:12.5px;color:#8b98a5}
+details input{width:70%}
+.foot{margin-top:10px;font-size:11px;color:#6b7785;line-height:1.4}
+#ph{display:none;text-align:center;color:#8b98a5;padding:30px}
 </style>
 </head>
 <body>
-<h1>📊 Market Scanner</h1>
-<div class="warn">⚠️ Outil éducatif basé sur des indicateurs techniques (tendance, RSI, MACD, Bollinger). Ce n'est <b>pas un conseil financier</b> : aucun indicateur ne prédit l'avenir. Je ne suis pas conseiller financier. Ne risquez que ce que vous pouvez perdre ; utilisez un compte démo et un stop-loss.</div>
-
-<div class="bar">
-  <button class="p" id="go">🔄 Analyser</button>
-  <span id="cats"></span>
-  <select id="tf" title="Intervalle des bougies"><option value="1m">Bougies 1 min</option><option value="5m">5 min</option><option value="15m">15 min</option><option value="1h">1 heure</option><option value="1d" selected>1 jour</option></select>
-  <select id="flt"><option value="all">Tous signaux</option><option value="buy">Acheter</option><option value="sell">Vendre</option></select>
-  <label title="Actualise tout seul et envoie une notification pour les nouveaux signaux forts"><input type="checkbox" id="auto"> Auto + alertes</label>
-  <select id="fr" title="Fréquence de l'actualisation auto"><option value="60">Toutes les 1 min</option><option value="120">2 min</option><option value="300">5 min</option></select>
-  <select id="np" title="Nombre de paires forex en intraday (moins = moins de quota)"><option value="3">3 paires</option><option value="7" selected>7 paires</option></select>
-  <span class="mut" id="st"></span>
+<p id="ph">Le scan est dans la petite fenêtre. Ferme-la pour le ramener ici.</p>
+<div id="app">
+  <div class="top"><b>📡 SCAN FOREX · 1 min</b><button id="pin" title="Petite fenêtre flottante">📌</button></div>
+  <button id="scan">SCAN</button>
+  <div id="msg"></div>
+  <div id="list"></div>
+  <details id="kb"><summary>Clé Twelve Data (gratuite)</summary>
+    <input id="key" placeholder="Colle ta clé ici"> <button id="sv">OK</button>
+    <div>Crée-la sur twelvedata.com. Elle reste dans ton navigateur.</div>
+  </details>
+  <div class="foot">Signal technique (tendance, RSI, MACD, Bollinger) : <b>pas un conseil financier</b>, il peut se tromper. Expiration conseillée : 5 min. Teste en démo.</div>
 </div>
-<div class="bar">
-  <input id="key" size="26" placeholder="Clé Twelve Data (optionnel : actions/indices/or)">
-  <button id="sk">Enregistrer</button>
-  <small>Gratuit sur twelvedata.com · 8 requêtes/min (analyse lente)</small>
-</div>
-
-<div class="wrap"><table>
-<thead><tr><th data-k="n">Actif</th><th data-k="c">Catégorie</th><th data-k="p">Prix</th><th data-k="d">Var. bougie</th><th data-k="r">RSI</th><th data-k="s">Score</th><th data-k="sg">Signal</th><th data-k="h" title="Réussite passée des signaux forts, 5 bougies plus tard (entre parenthèses : nombre de signaux testés)">Hist. 5b</th></tr></thead>
-<tbody id="tb"></tbody></table></div>
-
-<div id="det"><div id="dt" style="font-weight:700;font-size:16px"></div><canvas id="cv"></canvas><div class="g" id="gd"></div></div>
-
-<h2 style="font-size:17px;margin:22px 0 6px">📒 Journal de trades</h2>
-<div class="warn" style="border-color:var(--ac)">Note chaque trade (démo ou réel). Le calcul te dit si tu dépasses le taux de réussite minimum pour ne pas perdre.</div>
-<div class="bar">
-  <input id="ja" size="10" placeholder="Actif (EURUSD)">
-  <select id="jd"><option>Achat</option><option>Vente</option></select>
-  <select id="jt"><option>1 min</option><option>3 sec</option><option>5 min</option><option>15 min</option><option>Autre</option></select>
-  <input id="jm" type="number" min="0" step="any" placeholder="Mise" style="width:80px">
-  <input id="jp" type="number" min="1" max="100" value="85" title="Payout %" style="width:70px">
-  <select id="jr"><option value="W">Gagné</option><option value="L">Perdu</option></select>
-  <button class="p" id="jadd">Ajouter</button>
-  <button id="jclr">Tout effacer</button>
-</div>
-<div class="g" id="js"></div>
-<div class="wrap" style="margin-top:8px"><table style="min-width:520px"><thead><tr><th>#</th><th>Actif</th><th>Sens</th><th>Durée</th><th>Mise</th><th>Résultat</th><th></th></tr></thead><tbody id="jb"></tbody></table></div>
-
-<p class="mut" style="font-size:12px">Sources : Frankfurter (taux BCE, clôtures journalières) · Binance (crypto, public) · Twelve Data (optionnel). Le score va de −5 à +5 : ≥3 Acheter, ≤−3 Vendre. Les indicateurs de PocketOptionAPI (Python/WebSocket, nécessite un SSID, dépôt archivé) ne fonctionnent pas dans un navigateur ; ce site utilise donc des données publiques.</p>
-
 <script>
-const $=s=>document.querySelector(s);
-const CUR=['USD','GBP','JPY','CHF','CAD','AUD','NZD'];
-const FX=[['EUR','USD'],['GBP','USD'],['USD','JPY'],['USD','CHF'],['USD','CAD'],['AUD','USD'],['NZD','USD'],['EUR','GBP'],['EUR','JPY'],['EUR','CHF'],['GBP','JPY'],['AUD','JPY'],['EUR','AUD'],['EUR','CAD'],['GBP','CHF']];
-const CR=['BTC','ETH','BNB','SOL','XRP','ADA','DOGE','LTC','LINK','AVAX'];
-const TD=[['SPY','S&P 500 (ETF)'],['QQQ','Nasdaq 100 (ETF)'],['DIA','Dow Jones (ETF)'],['GLD','Or (ETF)'],['SLV','Argent (ETF)'],['USO','Pétrole (ETF)'],['AAPL','Apple'],['TSLA','Tesla'],['NVDA','Nvidia'],['MSFT','Microsoft']];
-const put=r=>{const i=rows.findIndex(x=>x.n===r.n);i>=0?rows[i]=r:rows.push(r)};
-let rows=[],cat='all',sortK='s',sortD=-1,busy=false;
-const cats=['all','Forex','Crypto','Marchés'];
-$('#cats').innerHTML=cats.map(c=>`<button data-c="${c}" class="${c==='all'?'on':''}">${c==='all'?'Tous':c}</button>`).join(' ');
-$('#cats').onclick=e=>{if(e.target.dataset.c){cat=e.target.dataset.c;[...$('#cats').children].forEach(b=>b.classList.toggle('on',b.dataset.c===cat));draw()}};
-$('#flt').onchange=draw;
-document.querySelectorAll('th').forEach(t=>t.onclick=()=>{const k=t.dataset.k;sortD=sortK===k?-sortD:-1;sortK=k;draw()});
+const app=document.getElementById('app'),$=s=>app.querySelector(s);
+const PAIRS=['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','USD/CHF','EUR/JPY'];
 try{$('#key').value=localStorage.getItem('tdk')||''}catch(e){}
-$('#sk').onclick=()=>{try{localStorage.setItem('tdk',$('#key').value.trim())}catch(e){}$('#st').textContent='Clé enregistrée'};
+if(!$('#key').value)$('#kb').open=true;
+$('#sv').onclick=()=>{try{localStorage.setItem('tdk',$('#key').value.trim())}catch(e){}msg('Clé enregistrée')};
+const msg=t=>{$('#msg').textContent=t};
 
-// ---------- Indicateurs ----------
-const sma=(a,n)=>a.length<n?null:a.slice(-n).reduce((x,y)=>x+y,0)/n;
-function ema(a,n){const k=2/(n+1);let e=a[0];const o=[e];for(let i=1;i<a.length;i++){e=a[i]*k+e*(1-k);o.push(e)}return o}
-function rsi(a,n=14){if(a.length<n+1)return null;let g=0,l=0;for(let i=1;i<=n;i++){const d=a[i]-a[i-1];d>0?g+=d:l-=d}g/=n;l/=n;
+// ---- indicateurs ----
+const sma=(a,n)=>a.slice(-n).reduce((x,y)=>x+y,0)/n;
+function ema(a,n){const k=2/(n+1);let e=a[0];return a.map((v,i)=>i?(e=v*k+e*(1-k)):e)}
+function rsi(a,n=14){let g=0,l=0;for(let i=1;i<=n;i++){const d=a[i]-a[i-1];d>0?g+=d:l-=d}g/=n;l/=n;
  for(let i=n+1;i<a.length;i++){const d=a[i]-a[i-1];g=(g*(n-1)+Math.max(d,0))/n;l=(l*(n-1)+Math.max(-d,0))/n}
  return l===0?100:100-100/(1+g/l)}
-function macd(a){const e12=ema(a,12),e26=ema(a,26),m=e12.map((v,i)=>v-e26[i]),s=ema(m,9);return{m:m.at(-1),s:s.at(-1),h:m.at(-1)-s.at(-1)}}
-function boll(a,n=20){const w=a.slice(-n),m=w.reduce((x,y)=>x+y,0)/n,sd=Math.sqrt(w.reduce((x,y)=>x+(y-m)**2,0)/n);return{u:m+2*sd,l:m-2*sd,m,pb:sd?(a.at(-1)-(m-2*sd))/(4*sd):.5}}
-function quick(c){
- const p=c.at(-1),s20=sma(c,20),s50=sma(c,50),R=rsi(c),M=macd(c),B=boll(c);
- let s=(p>s50?1:-1)+(s20>s50?1:-1)+(M.h>0?1:-1);
+function score(c){
+ const p=c.at(-1),s20=sma(c,20),s50=sma(c,50),R=rsi(c);
+ const m=ema(c,12).map((v,i)=>v-ema(c,26)[i]),h=m.at(-1)-ema(m,9).at(-1);
+ const w=c.slice(-20),mu=sma(c,20),sd=Math.sqrt(w.reduce((x,y)=>x+(y-mu)**2,0)/20),pb=sd?(p-(mu-2*sd))/(4*sd):.5;
+ let s=(p>s50?1:-1)+(s20>s50?1:-1)+(h>0?1:-1);
  if(R<30)s++;else if(R>70)s--;
- if(B.pb<.05)s++;else if(B.pb>.95)s--;
- return s}
-function backtest(c){
- const H=[1,3,5],o={};H.forEach(h=>o[h]={n:0,w:0});
- for(let i=55;i<c.length-1;i++){
-  const s=quick(c.slice(0,i+1));if(Math.abs(s)<3)continue;
-  H.forEach(h=>{if(i+h<c.length){const d=c[i+h]-c[i];if(d!==0){o[h].n++;if((d>0)===(s>0))o[h].w++}}})
- }
- return o}
-function analyse(name,catg,closes,dates){
- if(closes.length<55)return null;
- const p=closes.at(-1),s20=sma(closes,20),s50=sma(closes,50),R=rsi(closes),M=macd(closes),B=boll(closes);
- let sc=0;const why=[];
- if(p>s50){sc++;why.push('Prix > SMA50 (+1)')}else{sc--;why.push('Prix < SMA50 (−1)')}
- if(s20>s50){sc++;why.push('SMA20 > SMA50 (+1)')}else{sc--;why.push('SMA20 < SMA50 (−1)')}
- if(R<30){sc++;why.push('RSI survendu (+1)')}else if(R>70){sc--;why.push('RSI suracheté (−1)')}else why.push('RSI neutre (0)');
- if(M.h>0){sc++;why.push('MACD haussier (+1)')}else{sc--;why.push('MACD baissier (−1)')}
- if(B.pb<.05){sc++;why.push('Bas des Bollinger (+1)')}else if(B.pb>.95){sc--;why.push('Haut des Bollinger (−1)')}else why.push('Bollinger neutre (0)');
- const rets=closes.slice(-15).map((v,i,a)=>i?Math.log(v/a[i-1]):0).slice(1),vol=Math.sqrt(rets.reduce((x,y)=>x+y*y,0)/rets.length)*100;
- const sg=sc>=3?'buy':sc<=-3?'sell':'neu';
- const bt=backtest(closes),h=bt[5].n?bt[5].w/bt[5].n*100:-1;
- return{n:name,c:catg,p,d:(p/closes.at(-2)-1)*100,r:R,s:sc,sg,s20,s50,M,B,vol,why,closes,dates,bt,h}
-}
-const fmt=v=>v>=1000?v.toLocaleString('fr',{maximumFractionDigits:2}):v>=10?v.toFixed(3):v.toFixed(5);
+ if(pb<.05)s++;else if(pb>.95)s--;
+ return{s,px:p}}
 
-// ---------- Données ----------
-async function jget(urls){for(const u of urls){try{const c=new AbortController(),t=setTimeout(()=>c.abort(),15000);const r=await fetch(u,{signal:c.signal});clearTimeout(t);if(r.ok)return await r.json();try{const j=await r.json();if(j&&j.code)return j}catch(e){}}catch(e){}}throw new Error('fetch')}
-async function loadFX(){
- const st=new Date(Date.now()-280*864e5).toISOString().slice(0,10);
- const q=`${st}..?base=EUR&symbols=${CUR.join(',')}`;
- const j=await jget([`https://api.frankfurter.dev/v1/${q}`,`https://api.frankfurter.app/${q}`]);
- const dates=Object.keys(j.rates).sort();
- const rate=(d,c)=>c==='EUR'?1:j.rates[d][c];
- FX.forEach(([a,b])=>{
-  const cl=dates.map(d=>rate(d,b)/rate(d,a));
-  const r=analyse(`${a}/${b}`,'Forex',cl,dates);if(r)put(r)});
-}
-async function loadCrypto(tf){
- await Promise.all(CR.map(async c=>{
-  try{const j=await jget([`https://api.binance.com/api/v3/klines?symbol=${c}USDT&interval=${tf}&limit=250`,`https://data-api.binance.vision/api/v3/klines?symbol=${c}USDT&interval=${tf}&limit=250`]);
-   const r=analyse(`${c}/USDT`,'Crypto',j.map(k=>+k[4]),j.map(k=>new Date(k[0]).toISOString().slice(0,tf==='1d'?10:16).replace('T',' ')));if(r)put(r)}catch(e){}}))
-}
-async function loadTD(key){
- for(let i=0;i<TD.length;i++){
-  $('#st').textContent=`Marchés ${i+1}/${TD.length} (limite 8/min)…`;
-  try{const j=await jget([`https://api.twelvedata.com/time_series?symbol=${TD[i][0]}&interval=1day&outputsize=200&apikey=${key}`]);
-   if(j.values){const v=j.values.slice().reverse();const r=analyse(TD[i][1],'Marchés',v.map(x=>+x.close),v.map(x=>x.datetime));if(r){put(r);draw()}}
-   else if(j.code===429||/credits/i.test(j.message||'')){await new Promise(r=>setTimeout(r,62000));i--}
-  }catch(e){}
-  if((i+1)%8===0)await new Promise(r=>setTimeout(r,62000));
- }
-}
-const FXM=['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','USD/CHF','EUR/JPY'];
-const TDI={'1m':'1min','5m':'5min','15m':'15min','1h':'1h'};
-async function loadFXintra(key,tf){
- const L=FXM.slice(0,+$('#np').value);
- const one=async(sym,retry=1)=>{
-  try{const j=await jget([`https://api.twelvedata.com/time_series?symbol=${sym}&interval=${TDI[tf]}&outputsize=200&apikey=${key}`]);
-   if(j.values){const v=j.values.slice().reverse();const r=analyse(sym,'Forex',v.map(x=>+x.close),v.map(x=>x.datetime.slice(0,16)));if(r){put(r);draw()}}
-   else if(j.code===429&&retry){$('#st').textContent='Limite Twelve Data atteinte, pause 1 min…';await new Promise(r=>setTimeout(r,62000));return one(sym,0)}
-   else fxErr=j.message||('erreur '+j.code);
-  }catch(e){fxErr='connexion bloquée (réseau, VPN ou bloqueur de pub ?)'}
- };
- await Promise.all(L.map(x=>one(x)));
-}
-let fxErr='';
-async function runScan(){
- if(!($('#auto').checked&&rows.length)){rows=[];draw();$('#det').style.display='none'}
- $('#st').textContent='Chargement…';
- const tf=$('#tf').value,daily=tf==='1d',key=$('#key').value.trim();fxErr='';
- const jobs=[loadCrypto(tf)];
- if(daily)jobs.push(loadFX());
- if(key&&daily)jobs.push(loadTD(key));
- if(key&&!daily)jobs.push(loadFXintra(key,tf));
- const res=await Promise.allSettled(jobs.map(j=>j.finally(draw)));
- const wk=[0,6].includes(new Date().getUTCDay());
- $('#st').textContent=`${rows.length} actifs analysés (${tf}) · ${new Date().toLocaleTimeString('fr')}`+(res.some(x=>x.status==='rejected')?' · ⚠️ une source indisponible':'')+(!daily&&!key?' · forex intraday : ajoute une clé Twelve Data':'')+(wk&&key?' · ⚠️ forex fermé le week-end : données de vendredi':'')+(fxErr?' · ❌ Twelve Data : '+fxErr:'')+(key&&!daily&&$('#auto').checked&&+$('#fr').value<300?` · ⚠️ ~${Math.round(3600/+$('#fr').value*$('#np').value)} requêtes/h (limite gratuite : 800/jour)`:'');
- draw();alertNew();
-}
-let scanT=0;
-$('#go').onclick=async()=>{
- if(busy&&Date.now()-scanT<120000){$('#st').textContent='⏳ Analyse déjà en cours, patiente…';return}
- busy=true;scanT=Date.now();
- try{await runScan()}catch(e){$('#st').textContent='Erreur : '+e.message}
- finally{busy=false;draw()}
-};
+// ---- données ----
+async function jget(u){const c=new AbortController(),t=setTimeout(()=>c.abort(),15000);
+ try{const r=await fetch(u,{signal:c.signal});return await r.json()}finally{clearTimeout(t)}}
+const closed=()=>{const d=new Date(),w=d.getUTCDay(),h=d.getUTCHours();return w===6||(w===5&&h>=22)||(w===0&&h<22)};
+const fmt=v=>v>=50?v.toFixed(3):v.toFixed(5);
+const ARROW='<svg viewBox="0 0 24 24"><path d="M12 3l9 10h-6v8H9v-8H3z" fill="currentColor"/></svg>';
 
-// ---------- Affichage ----------
-const lab={buy:'ACHETER',sell:'VENDRE',neu:'NEUTRE'};
-function draw(){
- const f=$('#flt').value;
- let l=rows.filter(r=>(cat==='all'||r.c===cat)&&(f==='all'||r.sg===f));
- l.sort((a,b)=>{const x=a[sortK==='sg'?'s':sortK],y=b[sortK==='sg'?'s':sortK];return (x>y?1:x<y?-1:0)*sortD});
- $('#tb').innerHTML=l.map(r=>`<tr class="r" data-n="${r.n}"><td><b>${r.n}</b></td><td class="mut">${r.c}</td><td>${fmt(r.p)}</td><td class="${r.d>=0?'up':'dn'}">${r.d>=0?'+':''}${r.d.toFixed(2)}%</td><td>${r.r.toFixed(0)}</td><td>${r.s>0?'+':''}${r.s}</td><td><span class="b ${r.sg}">${lab[r.sg]}${Math.abs(r.s)===2?' (faible)':''}</span></td><td>${r.bt[5].n?r.h.toFixed(0)+'% <small>('+r.bt[5].n+')</small>':'–'}</td></tr>`).join('')||'<tr><td colspan="8" class="mut">Cliquez sur « Analyser »</td></tr>';
+async function scan(){
+ const key=$('#key').value.trim();
+ if(!key){$('#kb').open=true;return msg('Entre ta clé Twelve Data pour commencer');}
+ try{localStorage.setItem('tdk',key)}catch(e){}
+ const b=$('#scan');b.disabled=true;b.textContent='Analyse…';msg('');
+ const out=[];let err='',last='';
+ await Promise.all(PAIRS.map(async p=>{
+  try{const j=await jget(`https://api.twelvedata.com/time_series?symbol=${p}&interval=1min&outputsize=120&apikey=${key}`);
+   if(j.values&&j.values.length>=55){const c=j.values.slice().reverse().map(x=>+x.close);out.push({p,...score(c)});last=j.values[0].datetime}
+   else err=j.code===429?'Limite atteinte : attends 1 minute avant de relancer.':(j.message||'Données indisponibles');
+  }catch(e){err='Connexion impossible (réseau, VPN ou bloqueur de pub ?)'}
+ }));
+ out.sort((a,b)=>Math.abs(b.s)-Math.abs(a.s));
+ if(out.length)$('#list').innerHTML=out.map(r=>{
+  const up=r.s>=3,dn=r.s<=-3,wk=Math.abs(r.s)===2,cl=up?'up':dn?'dn':'ne';
+  const col=r.s>0?'#1fbf75':'#f04452';
+  const icon=(up||dn||wk)?`<span style="color:${col};display:flex;${r.s<0?'transform:rotate(180deg)':''}">${ARROW}</span>`:'<span style="width:34px;text-align:center;color:#6b7785;font-size:22px">—</span>';
+  const lab=up?'ACHETER<br>(HAUT)':dn?'VENDRE<br>(BAS)':wk?(r.s>0?'Haut faible':'Bas faible'):'Attendre';
+  return `<div class="row ${cl} ${wk?'weak':''}">${icon}<div class="n">${r.p}<small>${fmt(r.px)}</small></div><div class="l">${lab}</div></div>`}).join('');
+ const age=last?(Date.now()-new Date(last.replace(' ','T')+'Z'))/60000:0;
+ msg((err?err+' ':'')+(closed()?'⚠️ Forex fermé (week-end) : ce sont les données de vendredi, ne trade pas dessus. ':(age>10?'⚠️ Données en retard de '+Math.round(age)+' min. ':''))+(out.length&&!err?'Scan de '+new Date().toLocaleTimeString('fr'):''));
+ b.disabled=false;b.textContent='SCAN';
 }
-$('#tb').onclick=e=>{const tr=e.target.closest('tr.r');if(!tr)return;const r=rows.find(x=>x.n===tr.dataset.n);if(r)detail(r)};
-function detail(r){
- $('#det').style.display='block';
- $('#dt').innerHTML=`${r.n} <span class="b ${r.sg}">${lab[r.sg]}</span> <small>score ${r.s}</small>`;
- const g=[['Prix',fmt(r.p)],['SMA20',fmt(r.s20)],['SMA50',fmt(r.s50)],['RSI14',r.r.toFixed(1)],['MACD hist.',r.M.h.toExponential(2)],['Bollinger %B',(r.B.pb*100).toFixed(0)+'%'],['Volatilité 14j',r.vol.toFixed(2)+'%/j'],['Stop indicatif',fmt(r.sg==='sell'?r.p*(1+r.vol*2/100):r.p*(1-r.vol*2/100))+' (2×vol)']];
- $('#gd').innerHTML=g.map(x=>`<div><b>${x[0]}</b>${x[1]}</div>`).join('')+`<div style="grid-column:1/-1"><b>Détail du score</b>${r.why.join(' · ')}</div>`+`<div style="grid-column:1/-1"><b>Backtest : signaux forts passés sur cet actif (${r.closes.length} bougies)</b>${[1,3,5].map(h=>{const o=r.bt[h];return o.n?`+${h} bougie${h>1?'s':''} : <b class="${o.w/o.n>=.54?'up':'dn'}">${(o.w/o.n*100).toFixed(0)}%</b> sur ${o.n} signaux`:`+${h} : pas de signal`}).join(' · ')}<br><small>Seuil pour ne pas perdre : ~54 % (payout 85 %). Moins de 30 signaux = échantillon trop petit pour conclure. Le passé ne garantit rien.</small></div>`;
- chart(r);$('#det').scrollIntoView({behavior:'smooth'});
-}
-function chart(r){
- const cv=$('#cv'),dpr=devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;cv.width=W*dpr;cv.height=H*dpr;
- const x=cv.getContext('2d');x.scale(dpr,dpr);x.clearRect(0,0,W,H);
- const N=Math.min(120,r.closes.length),c=r.closes.slice(-N);
- const s20=c.map((_,i)=>sma(r.closes.slice(0,r.closes.length-N+i+1),20)),s50=c.map((_,i)=>sma(r.closes.slice(0,r.closes.length-N+i+1),50));
- const all=c.concat(s20.filter(Boolean),s50.filter(Boolean)),mn=Math.min(...all),mx=Math.max(...all);
- const X=i=>10+i*(W-20)/(N-1),Y=v=>H-14-(v-mn)/(mx-mn||1)*(H-28);
- const css=getComputedStyle(document.body);
- const line=(a,col,w)=>{x.beginPath();let s=false;a.forEach((v,i)=>{if(v==null)return;s?x.lineTo(X(i),Y(v)):x.moveTo(X(i),Y(v));s=true});x.strokeStyle=col;x.lineWidth=w;x.stroke()};
- line(c,css.color,1.6);line(s20,'#f0b429',1.2);line(s50,'#3b82f6',1.2);
- x.fillStyle='#8b98a5';x.font='11px sans-serif';x.fillText('— prix  — SMA20  — SMA50 · '+r.dates.at(-N)+' → '+r.dates.at(-1),10,12);
-}
-draw();
+$('#scan').onclick=()=>scan().catch(e=>{msg('Erreur : '+e.message);$('#scan').disabled=false;$('#scan').textContent='SCAN'});
 
-// ---------- Auto + alertes ----------
-let timer=null,worker=null,wl=null,prevSig=null;
-function stopTick(){clearInterval(timer);timer=null;if(worker){worker.terminate();worker=null}}
-async function keepAwake(){try{if('wakeLock' in navigator&&$('#auto').checked)wl=await navigator.wakeLock.request('screen')}catch(e){}}
-function setupAuto(){
- stopTick();
- if(!$('#auto').checked){try{wl&&wl.release()}catch(e){}wl=null;return}
- const ms=+$('#fr').value*1000,fire=()=>$('#go').click();
+// ---- petite fenêtre flottante (reste au-dessus de Pocket Option) ----
+let pw=null;const home=app.parentNode;
+$('#pin').onclick=async()=>{
+ if(pw){pw.close();return}
  try{
-  worker=new Worker(URL.createObjectURL(new Blob([`setInterval(()=>postMessage(1),${ms})`],{type:'text/javascript'})));
-  worker.onmessage=fire;
-  worker.onerror=()=>{stopTick();timer=setInterval(fire,ms)};
- }catch(e){timer=setInterval(fire,ms)}
- keepAwake();
-}
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&$('#auto').checked){keepAwake();$('#go').click()}});
-$('#auto').onchange=async()=>{
- if($('#auto').checked){
-  prevSig=null;
-  try{if('Notification' in window&&Notification.permission==='default')await Notification.requestPermission()}catch(e){}
-  $('#go').click();
- }
- setupAuto();
+  pw='documentPictureInPicture' in window?await documentPictureInPicture.requestWindow({width:320,height:470}):window.open('','scanfx','width=320,height=470');
+  if(!pw)throw 0;
+  document.querySelectorAll('style').forEach(s=>pw.document.head.append(s.cloneNode(true)));
+  pw.document.title='Scan Forex';pw.document.body.append(app);document.getElementById('ph').style.display='block';
+  pw.addEventListener('pagehide',()=>{home.append(app);document.getElementById('ph').style.display='none';pw=null});
+ }catch(e){pw=null;msg('Fenêtre flottante indisponible ici : sur téléphone, utilise l\'écran partagé.')}
 };
-$('#tf').onchange=()=>{prevSig=null;rows=[];draw();setupAuto()};
-$('#fr').onchange=setupAuto;
-function alertNew(){
- const cur={};rows.forEach(r=>cur[r.n]=Math.abs(r.s)>=3?r.sg:'neu');
- if(prevSig&&$('#auto').checked){
-  rows.forEach(r=>{
-   if(cur[r.n]!=='neu'&&prevSig[r.n]!==cur[r.n]){
-    try{if(Notification.permission==='granted')new Notification(`${lab[r.sg]} ${r.n}`,{body:`Score ${r.s>0?'+':''}${r.s} · prix ${fmt(r.p)} · RSI ${r.r.toFixed(0)}`})}catch(e){}
-   }
-  });
- }
- prevSig=cur;
-}
-
-// ---------- Journal ----------
-let J=[];
-try{J=JSON.parse(localStorage.getItem('jr')||'[]')}catch(e){}
-const saveJ=()=>{try{localStorage.setItem('jr',JSON.stringify(J))}catch(e){}};
-$('#jadd').onclick=()=>{
- const m=parseFloat($('#jm').value),p=parseFloat($('#jp').value);
- if(!(m>0)||!(p>0))return alert('Entre une mise et un payout valides');
- J.push({a:$('#ja').value.trim()||'?',d:$('#jd').value,t:$('#jt').value,m,p,r:$('#jr').value});
- saveJ();drawJ();
-};
-$('#jclr').onclick=()=>{if(confirm('Effacer tout le journal ?')){J=[];saveJ();drawJ()}};
-$('#jb').onclick=e=>{const i=e.target.dataset.x;if(i!==undefined){J.splice(+i,1);saveJ();drawJ()}};
-function drawJ(){
- const n=J.length,w=J.filter(x=>x.r==='W').length;
- const pnl=J.reduce((s,x)=>s+(x.r==='W'?x.m*x.p/100:-x.m),0);
- const avgP=n?J.reduce((s,x)=>s+x.p,0)/n:85,be=100/(1+avgP/100),wr=n?w/n*100:0;
- let streak=0;for(let i=n-1;i>=0&&J[i].r==='L';i--)streak++;
- let v='Pas encore de données';
- if(n>=1&&n<100)v=`Seulement ${n} trades : trop peu pour conclure (vise 200+).`;
- else if(n>=100)v=wr>be+3?'Au-dessus du seuil, mais vérifie sur plus de trades.':wr>=be-3?'Proche du seuil : aucun avantage prouvé.':'En dessous du seuil : tu perds de l\'argent à ce rythme.';
- const c=pnl>=0?'up':'dn';
- $('#js').innerHTML=[['Trades',n],['Réussite',wr.toFixed(1)+'%'],['Seuil pour 0 perte',be.toFixed(1)+'%'],['Résultat net',`<span class="${c}">${pnl>=0?'+':''}${pnl.toFixed(2)}</span>`],['Pertes d\'affilée',streak+(streak>=3?' ⛔ stop pour aujourd\'hui':'')],['Verdict',v]].map(x=>`<div><b>${x[0]}</b>${x[1]}</div>`).join('');
- $('#jb').innerHTML=J.map((x,i)=>`<tr><td>${i+1}</td><td>${x.a}</td><td>${x.d}</td><td>${x.t}</td><td>${x.m}</td><td class="${x.r==='W'?'up':'dn'}">${x.r==='W'?'Gagné +'+(x.m*x.p/100).toFixed(2):'Perdu −'+x.m}</td><td><button data-x="${i}">✕</button></td></tr>`).reverse().join('');
-}
-drawJ();
 </script>
 </body>
 </html>
