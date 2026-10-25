@@ -16,6 +16,7 @@ button{cursor:pointer}
 .big.stop{background:#3a2327;border-color:#6b2a33;color:#ff8a94}.big:disabled{opacity:.6}
 .card{background:#161c24;border:1px solid #232d3a;border-radius:12px;padding:12px;margin-top:10px;text-align:center}
 .card.up{background:rgba(31,191,117,.15);border-color:#1fbf75}.card.dn{background:rgba(240,68,82,.15);border-color:#f04452}
+.cr{display:flex;justify-content:space-between;gap:6px;font-size:12px;padding:3px 0;border-bottom:1px solid #1d2630}.cr b.g{color:#1fbf75}.cr b.r{color:#6b7785}
 .chips{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}.chips button{flex:1;font-size:12px;padding:6px 4px}.chips .on{border-color:#2f6bff;color:#7aa2ff;background:#16233f}
 .sig{display:flex;align-items:center;justify-content:center;gap:12px;min-height:84px}
 .sig svg{width:68px;height:68px}.sig .t{font-size:22px;font-weight:900}.sig small{display:block;font-size:12px;font-weight:400;color:#9aa7b4}
@@ -45,7 +46,7 @@ details{margin-top:10px;font-size:12.5px;color:#8b98a5}details input{width:68%}
 <p id="ph">Le scan est dans la petite fenêtre. Ferme-la pour le ramener ici.</p>
 <div id="app">
  <div class="top"><b>📡 SCAN PRO</b><button id="pin" title="Petite fenêtre flottante">📌</button></div>
- <div class="tabs"><button id="t1" class="on">⚡ Live 5 s</button><button id="t2">EUR/USD 1 min</button></div>
+ <div class="tabs"><button id="t1" class="on">⚡ Live 3 s</button><button id="t2">EUR/USD 1 min</button></div>
 
  <section id="live">
   <div class="chips" id="ch"></div>
@@ -57,11 +58,18 @@ details{margin-top:10px;font-size:12.5px;color:#8b98a5}details input{width:68%}
    <div class="st"><span class="dot" id="dt"></span><span id="stt">Arrêté</span></div>
   </div>
   <div class="card" style="text-align:left">
+   <b>🕯 Bougie 1 min en direct</b> <small id="ct" style="color:#8b98a5"></small>
+   <canvas id="cv" height="90" style="width:100%;height:90px;margin-top:6px"></canvas>
+  </div>
+  <div class="card" style="text-align:left">
+   <b>🧪 Indicateurs testés en direct</b><div style="font-size:11px;color:#8b98a5;margin:2px 0 6px">Seuls ceux qui prouvent leur efficacité sont utilisés. Les autres sont coupés.</div><div id="cp"></div>
+  </div>
+  <div class="card" style="text-align:left">
    <b>🎯 Précision mesurée · <span id="an"></span></b>
    <div class="grid"><div><b>Signaux testés</b><span id="sn">0</span></div><div><b>Réussite</b><span id="sr">–</span></div><div><b>Seuil pour ne pas perdre</b><span id="sb">–</span></div><div><b>Réussite sûre (95 %)</b><span id="sl">–</span></div></div>
    <div class="verdict v-w" id="vd">Calibrage : lance le scan et laisse-le tourner.</div>
    <div class="dots" id="ds"></div>
-   <div style="margin-top:8px;font-size:12px;color:#8b98a5">Payout % <input id="po" type="number" value="85" min="50" max="100" style="width:64px"> <button id="rs">Remettre à zéro</button></div>
+   <div style="margin-top:8px;font-size:12px;color:#8b98a5">Délai clic (s) <input id="dl" type="number" value="1" min="0" max="5" style="width:52px"> · Payout % <input id="po" type="number" value="85" min="50" max="100" style="width:64px"> <button id="rs">Remettre à zéro</button></div>
   </div>
  </section>
 
@@ -75,7 +83,7 @@ details{margin-top:10px;font-size:12.5px;color:#8b98a5}details input{width:68%}
   <div style="margin-bottom:8px">finnhub.io → Register. Pour le live EUR/USD, USD/JPY, AAPL.</div>
   <input id="key" placeholder="Clé Twelve Data (onglet Forex 1 min)"> <button id="sv">OK</button>
   <div>twelvedata.com · les clés restent dans ton navigateur.</div></details>
- <div class="foot">Signaux techniques : <b>pas un conseil financier</b>. SOL : Binance (24h/24). EUR/USD, USD/JPY : forex fermé du vendredi soir au dimanche soir ; Apple : heures de Bourse US. Rien ne garantit un gain ; à 5 s le résultat est proche du hasard. Le scan mesure sa propre précision (avec 2 s de délai de clic) et te dit quand ne PAS trader. Les prix viennent de Binance, pas de Pocket Option : teste en démo.</div>
+ <div class="foot">Signaux techniques : <b>pas un conseil financier</b>. SOL : Binance (24h/24). EUR/USD, USD/JPY : forex fermé du vendredi soir au dimanche soir ; Apple : heures de Bourse US. Rien ne garantit un gain ; à 3 s le résultat est proche du hasard. Le scan mesure sa propre précision (avec ton délai de clic) et te dit quand ne PAS trader. Les bougies 1 min sont construites sur l'horloge de la bourse : la forme peut différer légèrement de ton graphique (autre source de prix). Les prix viennent de Binance, pas de Pocket Option : teste en démo.</div>
 </div>
 <script>
 const app=document.getElementById('app'),$=s=>app.querySelector(s);
@@ -100,19 +108,33 @@ function score(c){
  let s=(p>s50?1:-1)+(s20>s50?1:-1)+(h>0?1:-1);if(R<30)s++;else if(R>70)s--;if(pb<.05)s++;else if(pb>.95)s--;return{s,px:p}}
 const fmt=v=>v>=50?v.toFixed(3):v.toFixed(5);
 
-// ---------- LIVE 5 s ----------
-const AS={SOL:{n:'SOL/USDT',src:'bn',sym:'solusdt',d:3},EURUSD:{n:'EUR/USD',src:'fh',sym:'OANDA:EUR_USD',d:5},USDJPY:{n:'USD/JPY',src:'fh',sym:'OANDA:USD_JPY',d:3},AAPL:{n:'Apple',src:'fh',sym:'AAPL',d:2}};
-const DELAY=2,HOR=5,WARM=20;
+// ---------- LIVE 3 s + bougies 1 min ----------
+const AS={SOL:{n:'SOL/USDT',src:'bn',sym:'solusdt',d:3,td:''},EURUSD:{n:'EUR/USD',src:'fh',sym:'OANDA:EUR_USD',d:5,td:'EUR/USD'},USDJPY:{n:'USD/JPY',src:'fh',sym:'OANDA:USD_JPY',d:3,td:'USD/JPY'},AAPL:{n:'Apple',src:'fh',sym:'AAPL',d:2,td:'AAPL'}};
+const HOR=3,WARM=20,NAMES=['Tendance 1 min (EMA 9/21)','Couleur de la bougie en cours','Micro-tendance 1 s','Élan sur 3 s','Flux acheteur / vendeur'];
+const DEL=()=>Math.max(0,Math.min(5,+$('#dl').value||0));
 let A='SOL',ws=null,run=false,bars=[],cur={b:0,s:0,n:0},last=0,lastT=0,prevP=0,prevSide=0,t0=0,tk=null,active=null,cool=0,timers=[],fhErr='';
-let ST={};try{ST=JSON.parse(ls.g('st6')||'{}')||{}}catch(e){}
-if(!ST.SOL){try{const o=JSON.parse(ls.g('st5')||'');if(o&&o.n)ST.SOL=o}catch(e){}}
+let candles=[],off=0,sec=0,pxs=[],pend=[],CS=NAMES.map(()=>({n:0,w:0}));
+let ST={};try{ST=JSON.parse(ls.g('st7')||'{}')||{}}catch(e){}
 const S=()=>ST[A]||(ST[A]={n:0,w:0,h:[]});
-const save=()=>ls.s('st6',JSON.stringify(ST));
+const save=()=>ls.s('st7',JSON.stringify(ST));
 function chips(){$('#ch').innerHTML=Object.keys(AS).map(k=>`<button data-k="${k}" class="${k===A?'on':''}">${AS[k].n}</button>`).join('');$('#an').textContent=AS[A].n}
 $('#ch').onclick=e=>{const k=e.target.dataset.k;if(!k||k===A)return;const was=run;if(was)stopLive();A=k;chips();stats();idle();if(was)startLive()};
 function setState(t,c){$('#stt').textContent=t;$('#dt').className='dot '+(c||'')}
 function idle(){$('#sc').className='card';$('#sg').innerHTML='<div class="t" style="color:#8b98a5;font-size:15px">Appuie sur SCAN</div>';$('#mt').innerHTML='';$('#pb').style.width='0'}
-function onTick(p,q,side){last=p;lastT=Date.now();if(!side)side=p>prevP?1:p<prevP?-1:prevSide;if(side)prevSide=side;prevP=p;side>0?cur.b+=q:cur.s+=q;cur.n++}
+function onTick(p,q,side,ts){
+ last=p;lastT=Date.now();ts=ts||lastT;off=off?off*.9+(ts-lastT)*.1:ts-lastT;
+ const m=Math.floor(ts/60000)*60000,k=candles.at(-1);
+ if(!k||m>k.t){candles.push({t:m,o:p,h:p,l:p,c:p});if(candles.length>90)candles.shift()}
+ else if(m===k.t){k.h=Math.max(k.h,p);k.l=Math.min(k.l,p);k.c=p}
+ if(!side)side=p>prevP?1:p<prevP?-1:prevSide;if(side)prevSide=side;prevP=p;side>0?cur.b+=q:cur.s+=q;cur.n++}
+async function seed(){
+ const a=AS[A];
+ try{
+  if(a.src==='bn'){const j=await jget('https://data-api.binance.vision/api/v3/klines?symbol=SOLUSDT&interval=1m&limit=60');if(Array.isArray(j))candles=j.map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4]}))}
+  else if($('#key').value.trim()){const j=await jget(`https://api.twelvedata.com/time_series?symbol=${a.td}&interval=1min&outputsize=60&timezone=UTC&apikey=${$('#key').value.trim()}`);
+   if(j.values)candles=j.values.slice().reverse().map(x=>({t:Date.parse(x.datetime.replace(' ','T')+'Z'),o:+x.open,h:+x.high,l:+x.low,c:+x.close}))}
+ }catch(e){}
+}
 function connect(u){
  const a=AS[A];let url;
  if(a.src==='bn')url=['wss://stream.binance.com:9443/ws/','wss://data-stream.binance.vision/ws/'][u%2]+a.sym+'@trade';
@@ -120,41 +142,58 @@ function connect(u){
  ws=new WebSocket(url);
  ws.onopen=()=>{if(a.src==='fh')ws.send(JSON.stringify({type:'subscribe',symbol:a.sym}));setState('Connecté · en attente des prix…','wait')};
  ws.onmessage=e=>{const d=JSON.parse(e.data);
-  if(a.src==='bn')onTick(+d.p,+d.q,d.m?-1:1);
-  else if(d.type==='trade')d.data.forEach(x=>{if(x.s===a.sym)onTick(+x.p,+x.v||1,0)});
+  if(a.src==='bn')onTick(+d.p,+d.q,d.m?-1:1,d.T);
+  else if(d.type==='trade')d.data.forEach(x=>{if(x.s===a.sym)onTick(+x.p,+x.v||1,0,x.t)});
   else if(d.type==='error')fhErr=d.msg||'erreur'};
  ws.onclose=()=>{if(run){setState('Reconnexion…','wait');setTimeout(()=>run&&connect(u+1),2500)}};
  ws.onerror=()=>{try{ws.close()}catch(e){}};
 }
-function liveScore(){
- const P=bars.map(x=>x.p),e5=ema(P,5).at(-1),e20=ema(P,20).at(-1),mom=P.at(-1)-P.at(-6);
- const L=bars.slice(-10),b=L.reduce((x,y)=>x+y.b,0),sv=L.reduce((x,y)=>x+y.s,0),imb=b+sv?(b-sv)/(b+sv):0;
- return{sc:(e5>e20?1:-1)+(mom>0?1:mom<0?-1:0)+(imb>.25?1:imb<-.25?-1:0),imb}}
+function comps(){
+ const C=candles.map(x=>x.c),k=candles.at(-1),P=bars.map(x=>x.p),o=[0,0,0,0,0];
+ if(C.length>=22)o[0]=ema(C,9).at(-1)>ema(C,21).at(-1)?1:-1;
+ if(k&&k.c!==k.o)o[1]=k.c>k.o?1:-1;
+ o[2]=ema(P,5).at(-1)>ema(P,20).at(-1)?1:-1;
+ o[3]=Math.sign(P.at(-1)-P.at(-1-HOR));
+ const L=bars.slice(-10),b=L.reduce((x,y)=>x+y.b,0),v=L.reduce((x,y)=>x+y.s,0),imb=b+v?(b-v)/(b+v):0;
+ o[4]=imb>.25?1:imb<-.25?-1:0;return{o,imb}}
+function drawC(){
+ const cv=$('#cv'),W=cv.clientWidth||320,H=90;cv.width=W;cv.height=H;const x=cv.getContext('2d');x.clearRect(0,0,W,H);
+ const L=candles.slice(-30);if(!L.length)return;
+ const mn=Math.min(...L.map(c=>c.l)),mx=Math.max(...L.map(c=>c.h)),r=mx-mn||1,Y=v=>H-4-(v-mn)/r*(H-8),w=W/L.length;
+ L.forEach((c,i)=>{const cx=i*w+w/2,col=c.c>=c.o?'#1fbf75':'#f04452';x.strokeStyle=col;x.fillStyle=col;x.beginPath();x.moveTo(cx,Y(c.h));x.lineTo(cx,Y(c.l));x.stroke();const t=Y(Math.max(c.o,c.c)),b=Y(Math.min(c.o,c.c));x.fillRect(cx-w*.3,t,w*.6,Math.max(1,b-t))})}
 function tick(){
  const age=Date.now()-lastT;
  if(!last||age>10000){
   const x=last?`Aucun prix depuis ${Math.round(age/1000)} s`:(Date.now()-t0>10000?'Aucun prix reçu':'En attente du premier prix…');
   setState('⚠️ '+x+' · marché fermé ?'+(fhErr?' ('+fhErr+')':''),'wait');return}
- bars.push({p:last,b:cur.b,s:cur.s});if(bars.length>120)bars.shift();
+ sec++;pxs[sec]=last;bars.push({p:last,b:cur.b,s:cur.s,n:cur.n});if(bars.length>120)bars.shift();
  const tps=cur.n;cur={b:0,s:0,n:0};
+ const k=candles.at(-1),rem=Math.ceil(60-((Date.now()+off)/1000)%60),d=DEL(),dp=AS[A].d;
+ if(k){$('#ct').textContent=`· O ${k.o.toFixed(dp)} H ${k.h.toFixed(dp)} L ${k.l.toFixed(dp)} C ${k.c.toFixed(dp)} · ⏱ ${rem} s`;drawC()}
+ while(pend.length&&pend[0].s+d+HOR<=sec){const q=pend.shift(),y=Math.sign(pxs[q.s+d+HOR]-pxs[q.s+d]);
+  if(y)q.c.forEach((v,i)=>{if(v){CS[i].n=CS[i].n*.998+1;CS[i].w=CS[i].w*.998+(v===y?1:0)}})}
  if(bars.length<WARM){$('#pb').style.width=(bars.length/WARM*100)+'%';setState(`Collecte des prix ${bars.length}/${WARM} s`,'wait');return}
- $('#pb').style.width=active?Math.min(100,(Date.now()-active.t)/((DELAY+HOR)*10))+'%':'100%';
- const L=liveScore();
- $('#mt').innerHTML=[-3,-2,-1,0,1,2,3].map(v=>`<b style="${L.sc===v?'background:'+(v>0?'#1fbf75':v<0?'#f04452':'#8b98a5'):''}"></b>`).join('');
- if(active){setState(`Signal en cours · résultat dans ${Math.max(0,Math.ceil((active.t+(DELAY+HOR)*1000-Date.now())/1000))} s`,'on');return}
- setState(`Analyse en direct · ${tps} ticks/s · ${last.toFixed(AS[A].d)}`,'on');
+ const C=comps();pend.push({s:sec,c:C.o});
+ const act=CS.map(c=>c.n>=60&&wilson(c.w/4,c.n/4)>50),nz=C.o.map((v,i)=>act[i]?v:0),sc=nz.reduce((a,b)=>a+b,0),na=nz.filter(v=>v).length,nact=act.filter(Boolean).length;
+ $('#cp').innerHTML=NAMES.map((n,i)=>{const c=CS[i];return `<div class="cr"><span>${n}</span><span>${c.n>=10?(c.w/c.n*100).toFixed(0)+' %':'…'}</span><b class="${act[i]?'g':'r'}">${act[i]?'ACTIF':'COUPÉ'}</b></div>`}).join('');
+ $('#pb').style.width=active?Math.min(100,(Date.now()-active.t)/((d+HOR)*10))+'%':'100%';
+ $('#mt').innerHTML=[-3,-2,-1,0,1,2,3].map(v=>`<b style="${Math.max(-3,Math.min(3,sc))===v?'background:'+(v>0?'#1fbf75':v<0?'#f04452':'#8b98a5'):''}"></b>`).join('');
+ if(active){setState(`Signal en cours · résultat dans ${Math.max(0,Math.ceil((active.t+(d+HOR)*1000-Date.now())/1000))} s`,'on');return}
+ setState(`Analyse en direct · ${tps} ticks/s · ${last.toFixed(dp)}`,'on');
  $('#sc').className='card';
- $('#sg').innerHTML=`<div class="t" style="color:#9aa7b4;font-size:17px">🔍 ANALYSE…<small>score ${L.sc>0?'+':''}${L.sc} · flux ${L.imb>0?'acheteur':'vendeur'} ${Math.abs(L.imb*100).toFixed(0)} %</small></div>`;
- if(Math.abs(L.sc)===3&&Date.now()>cool)fire(L.sc>0?1:-1);
+ const msgs=nact===0?(sec<120?`calibrage des indicateurs… ${sec}/120 s`:'aucun indicateur fiable : pas de signal'):`${nact}/5 indicateurs fiables · bougie ${k&&k.c>=k.o?'verte':'rouge'}`;
+ $('#sg').innerHTML=`<div class="t" style="color:#9aa7b4;font-size:17px">🔍 ANALYSE…<small>${msgs}</small></div>`;
+ const R=candles.length>15?rsi(candles.map(x=>x.c)):50,tr=bars.slice(-10).reduce((a,b)=>a+b.n,0)/10;
+ if(na>=2&&Math.abs(sc)===na&&tr>=1&&!(sc>0&&R>75)&&!(sc<0&&R<25)&&Date.now()>cool)fire(sc>0?1:-1);
 }
-function fire(d){
- const a=active={d,t:Date.now(),entry:0,id:A},v=verdict(),ok=v.k==='ok';cool=Date.now()+(DELAY+HOR+3)*1000;
- $('#sc').className='card '+(d>0?'up':'dn');
- $('#sg').innerHTML=`<span style="color:${d>0?'#1fbf75':'#f04452'};display:flex;opacity:${ok?1:.4};${d<0?'transform:rotate(180deg)':''}">${ARROW}</span><div class="t">${d>0?'ACHETER':'VENDRE'}<small>${ok?(d>0?'HAUT ▲ · entre maintenant':'BAS ▼ · entre maintenant'):'⛔ signal de TEST : n\'entre pas'}</small></div>`;
- timers.push(setTimeout(()=>{a.entry=last},DELAY*1000));
+function fire(dir){
+ const d=DEL(),a=active={d:dir,t:Date.now(),entry:0,id:A},v=verdict(),ok=v.k==='ok';cool=Date.now()+(d+HOR+3)*1000;
+ $('#sc').className='card '+(dir>0?'up':'dn');
+ $('#sg').innerHTML=`<span style="color:${dir>0?'#1fbf75':'#f04452'};display:flex;opacity:${ok?1:.4};${dir<0?'transform:rotate(180deg)':''}">${ARROW}</span><div class="t">${dir>0?'ACHETER':'VENDRE'}<small>${ok?(dir>0?'HAUT ▲':'BAS ▼')+' · entre maintenant · '+HOR+' s':'⛔ signal de TEST : n\'entre pas'}</small></div>`;
+ timers.push(setTimeout(()=>{a.entry=last},d*1000));
  timers.push(setTimeout(()=>{
-  if(a.entry&&last!==a.entry){const w=(last>a.entry)===(d>0),s=ST[a.id]||(ST[a.id]={n:0,w:0,h:[]});s.n++;if(w)s.w++;s.h.push(w?1:0);if(s.h.length>24)s.h.shift();save()}
-  active=null;stats()},(DELAY+HOR)*1000));
+  if(a.entry&&last!==a.entry){const w=(last>a.entry)===(dir>0),s=ST[a.id]||(ST[a.id]={n:0,w:0,h:[]});s.n++;if(w)s.w++;s.h.push(w?1:0);if(s.h.length>24)s.h.shift();save()}
+  active=null;stats()},(d+HOR)*1000));
 }
 function wilson(w,n){if(!n)return 0;const z=1.96,p=w/n;return(p+z*z/(2*n)-z*Math.sqrt((p*(1-p)+z*z/(4*n))/n))/(1+z*z/n)*100}
 function verdict(){
@@ -173,13 +212,14 @@ function stats(){
 $('#po').onchange=stats;
 $('#rs').onclick=()=>{if(confirm('Remettre à zéro les stats de '+AS[A].n+' ?')){ST[A]={n:0,w:0,h:[]};save();stats()}};
 function stopLive(){run=false;try{ws.close()}catch(e){}clearInterval(tk);timers.forEach(clearTimeout);timers=[];active=null;const b=$('#go5');b.textContent='▶ SCAN';b.classList.remove('stop');setState('Arrêté','');idle()}
-function startLive(){
+async function startLive(){
  const a=AS[A];
  if(a.src==='fh'&&!$('#fk').value.trim()){$('#kb').open=true;setState('Colle ta clé Finnhub (gratuite) ci-dessous','wait');return}
- run=true;bars=[];cur={b:0,s:0,n:0};last=0;lastT=0;prevP=0;prevSide=0;fhErr='';t0=Date.now();
- const b=$('#go5');b.textContent='■ STOP';b.classList.add('stop');setState('Connexion…','wait');
+ run=true;bars=[];cur={b:0,s:0,n:0};last=0;lastT=0;prevP=0;prevSide=0;fhErr='';t0=Date.now();sec=0;pxs=[];pend=[];off=0;candles=[];CS=NAMES.map(()=>({n:0,w:0}));
+ const b=$('#go5');b.textContent='■ STOP';b.classList.add('stop');setState('Chargement des bougies 1 min…','wait');
  $('#sg').innerHTML='<div class="t" style="color:#f0b429;font-size:15px">⏳ Préparation…</div>';
- connect(0);tk=setInterval(tick,1000);
+ await seed();if(!run)return;
+ setState('Connexion…','wait');connect(0);tk=setInterval(tick,1000);
 }
 $('#go5').onclick=()=>run?stopLive():startLive();
 chips();stats();
