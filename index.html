@@ -7,7 +7,7 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#0e1217;color:#e8edf2;font:14px system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-#app{width:100%;max-width:360px;margin:0 auto;padding:10px}
+#app{width:100%;max-width:520px;margin:0 auto;padding:10px}
 .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 button,input{font:inherit;border-radius:8px;border:1px solid #2c3644;background:#1a212b;color:inherit;padding:7px 10px}
 button{cursor:pointer}
@@ -17,6 +17,7 @@ button{cursor:pointer}
 .card{background:#161c24;border:1px solid #232d3a;border-radius:12px;padding:12px;margin-top:10px;text-align:center}
 .card.up{background:rgba(31,191,117,.15);border-color:#1fbf75}.card.dn{background:rgba(240,68,82,.15);border-color:#f04452}
 .cr{display:flex;justify-content:space-between;gap:6px;font-size:12px;padding:3px 0;border-bottom:1px solid #1d2630}.cr b.g{color:#1fbf75}.cr b.r{color:#6b7785}
+.tvw{width:100%;height:360px;border:0;border-radius:8px;margin-top:6px;background:#0e1217}
 .chips{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}.chips button{flex:1;font-size:12px;padding:6px 4px}.chips .on{border-color:#2f6bff;color:#7aa2ff;background:#16233f}
 .sig{display:flex;align-items:center;justify-content:center;gap:12px;min-height:84px}
 .sig svg{width:68px;height:68px}.sig .t{font-size:22px;font-weight:900}.sig small{display:block;font-size:12px;font-weight:400;color:#9aa7b4}
@@ -58,6 +59,11 @@ details{margin-top:10px;font-size:12.5px;color:#8b98a5}details input{width:68%}
    <div class="st"><span class="dot" id="dt"></span><span id="stt">Arrêté</span></div>
   </div>
   <div class="card" style="text-align:left">
+   <details open><summary><b>📈 Graphique 1 min (TradingView)</b></summary>
+   <iframe id="tv" class="tvw" title="Graphique" allowfullscreen></iframe>
+   <div style="font-size:11px;color:#6b7785;margin-top:4px">Même type de graphique que les plateformes de trading : zoom, indicateurs, outils de dessin. Les prix peuvent différer un peu de Pocket Option.</div></details>
+  </div>
+  <div class="card" style="text-align:left">
    <b>🕯 Bougie 1 min en direct</b> <small id="ct" style="color:#8b98a5"></small>
    <canvas id="cv" height="90" style="width:100%;height:90px;margin-top:6px"></canvas>
   </div>
@@ -70,6 +76,13 @@ details{margin-top:10px;font-size:12.5px;color:#8b98a5}details input{width:68%}
    <div class="verdict v-w" id="vd">Calibrage : lance le scan et laisse-le tourner.</div>
    <div class="dots" id="ds"></div>
    <div style="margin-top:8px;font-size:12px;color:#8b98a5">Délai clic (s) <input id="dl" type="number" value="1" min="0" max="5" style="width:52px"> · Payout % <input id="po" type="number" value="85" min="50" max="100" style="width:64px"> <button id="rs">Remettre à zéro</button></div>
+  </div>
+  <div class="card" style="text-align:left">
+   <b>🛡 Garde-fou (argent réel)</b>
+   <div style="margin-top:6px;font-size:12px;color:#8b98a5">Capital sur le compte <input id="cap" type="number" min="0" placeholder="ex. 50" style="width:80px"> · Perte max du jour <input id="lim" type="number" value="5" min="1" max="20" style="width:52px"> %</div>
+   <div class="grid" id="gd"></div>
+   <div style="display:flex;gap:6px;margin-top:8px"><button id="bw" style="flex:1">✅ J'ai gagné</button><button id="bl" style="flex:1">❌ J'ai perdu</button></div>
+   <div style="font-size:11px;color:#6b7785;margin-top:6px">Appuie après chaque trade que TU as pris. Stop automatique après 3 pertes d'affilée ou à la limite du jour.</div>
   </div>
  </section>
 
@@ -110,15 +123,18 @@ const fmt=v=>v>=50?v.toFixed(3):v.toFixed(5);
 
 // ---------- LIVE 3 s + bougies 1 min ----------
 const AS={SOL:{n:'SOL/USDT',src:'bn',sym:'solusdt',d:3,td:'',lo:2,hi:3000},EURUSD:{n:'EUR/USD',src:'fh',sym:'OANDA:EUR_USD',d:5,td:'EUR/USD',lo:.5,hi:2},USDJPY:{n:'USD/JPY',src:'fh',sym:'OANDA:USD_JPY',d:3,td:'USD/JPY',lo:50,hi:300},AAPL:{n:'Apple',src:'fh',sym:'AAPL',d:2,td:'AAPL',lo:20,hi:2000}};
+const TV={SOL:'BINANCE:SOLUSDT',EURUSD:'OANDA:EURUSD',USDJPY:'OANDA:USDJPY',AAPL:'NASDAQ:AAPL'};
 const HOR=3,WARM=20,NAMES=['Tendance 1 min (EMA 9/21)','Couleur de la bougie en cours','Micro-tendance 1 s','Élan sur 3 s','Flux acheteur / vendeur'];
 const DEL=()=>Math.max(0,Math.min(5,+$('#dl').value||0));
-let A='SOL',cid=0,bad=0,ws=null,run=false,bars=[],cur={b:0,s:0,n:0},last=0,lastT=0,prevP=0,prevSide=0,t0=0,tk=null,active=null,cool=0,timers=[],fhErr='';
+let A=ls.g('asset');if(!AS[A])A='SOL';
+let tw=null,wl=null,cid=0,bad=0,ws=null,run=false,bars=[],cur={b:0,s:0,n:0},last=0,lastT=0,prevP=0,prevSide=0,t0=0,tk=null,active=null,cool=0,timers=[],fhErr='';
 let candles=[],off=0,sec=0,pxs=[],pend=[],CS=NAMES.map(()=>({n:0,w:0}));
 let ST={};try{ST=JSON.parse(ls.g('st7')||'{}')||{}}catch(e){}
 const S=()=>ST[A]||(ST[A]={n:0,w:0,h:[]});
 const save=()=>ls.s('st7',JSON.stringify(ST));
-function chips(){$('#ch').innerHTML=Object.keys(AS).map(k=>`<button data-k="${k}" class="${k===A?'on':''}">${AS[k].n}</button>`).join('');$('#an').textContent=AS[A].n}
-$('#ch').onclick=e=>{const k=e.target.dataset.k;if(!k||k===A)return;const was=run;if(was)stopLive();A=k;chips();stats();idle();if(was)startLive()};
+function tvChart(){$('#tv').src='https://s.tradingview.com/widgetembed/?symbol='+encodeURIComponent(TV[A])+'&interval=1&theme=dark&style=1&locale=fr&timezone=Etc%2FUTC&withdateranges=1&hide_side_toolbar=0&allow_symbol_change=0&saveimage=0&studies=%5B%5D'}
+function chips(){tvChart();$('#ch').innerHTML=Object.keys(AS).map(k=>`<button data-k="${k}" class="${k===A?'on':''}">${AS[k].n}</button>`).join('');$('#an').textContent=AS[A].n}
+$('#ch').onclick=e=>{const k=e.target.dataset.k;if(!k||k===A)return;const was=run;if(was)stopLive();A=k;ls.s('asset',k);chips();stats();idle();if(was)startLive()};
 function setState(t,c){$('#stt').textContent=t;$('#dt').className='dot '+(c||'')}
 function idle(){$('#sc').className='card';$('#sg').innerHTML='<div class="t" style="color:#8b98a5;font-size:15px">Appuie sur SCAN</div>';$('#mt').innerHTML='';$('#pb').style.width='0';candles=[];last=0;bad=0;$('#ct').textContent='';$('#cp').innerHTML='';drawC()}
 function onTick(p,q,side,ts){
@@ -187,7 +203,8 @@ function tick(){
  $('#sg').innerHTML=`<div class="t" style="color:#9aa7b4;font-size:17px">🔍 ANALYSE…<small>${msgs}</small></div>`;
  const R=candles.length>15?rsi(candles.map(x=>x.c)):50,tr=bars.slice(-10).reduce((a,b)=>a+b.n,0)/10;
  const good=na>=2&&Math.abs(sc)===na&&tr>=1&&!(sc>0&&R>75)&&!(sc<0&&R<25),all=C.o.reduce((a,b)=>a+b,0);
- if(Date.now()>cool){if(good)fire(sc>0?1:-1,true);else if(Math.abs(all)>=2)fire(all>0?1:-1,false)}
+ if(gstate().lock){$('#sc').className='card dn';$('#sg').innerHTML='<div class="t" style="color:#f04452;font-size:17px">⛔ STOP POUR AUJOURD\'HUI<small>Limite atteinte : reviens demain</small></div>'}
+ else if(Date.now()>cool){if(good)fire(sc>0?1:-1,true);else if(Math.abs(all)>=2)fire(all>0?1:-1,false)}
 }
 function fire(dir,good){
  const d=DEL(),a=active={d:dir,t:Date.now(),entry:0,id:A},v=verdict(),ok=v.k==='ok';cool=Date.now()+(d+HOR+3)*1000;
@@ -201,7 +218,7 @@ function fire(dir,good){
 function wilson(w,n){if(!n)return 0;const z=1.96,p=w/n;return(p+z*z/(2*n)-z*Math.sqrt((p*(1-p)+z*z/(4*n))/n))/(1+z*z/n)*100}
 function verdict(){
  const s=S(),po=+$('#po').value||85,be=100/(1+po/100),n=s.n,r=n?s.w/n*100:0,lb=wilson(s.w,n);let k,t;
- if(n<50){k='w';t=`Calibrage : ${n}/50 signaux. Ne trade PAS en réel avant.`}
+ if(n<100){k='w';t=`Calibrage : ${n}/100 signaux. Ne trade PAS en réel avant.`}
  else if(lb>=be){k='ok';t='✅ Avantage probable mesuré. Reste prudent (petites mises).'}
  else if(r<be){k='no';t='⛔ Précision sous le seuil : ne trade pas, tu perdrais de l\'argent.'}
  else{k='w';t='⚠️ Pas de preuve d\'avantage : attends plus de signaux.'}
@@ -214,7 +231,9 @@ function stats(){
 }
 $('#po').onchange=stats;
 $('#rs').onclick=()=>{if(confirm('Remettre à zéro les stats de '+AS[A].n+' ?')){ST[A]={n:0,w:0,h:[]};save();stats()}};
-function stopLive(){run=false;cid++;try{ws.close()}catch(e){}clearInterval(tk);timers.forEach(clearTimeout);timers=[];active=null;const b=$('#go5');b.textContent='▶ SCAN';b.classList.remove('stop');setState('Arrêté','');idle()}
+async function keepAwake(){try{if('wakeLock' in navigator&&run)wl=await navigator.wakeLock.request('screen')}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&run)keepAwake()});
+function stopLive(){run=false;cid++;if(tw){tw.terminate();tw=null}try{wl&&wl.release()}catch(e){}wl=null;try{ws.close()}catch(e){}clearInterval(tk);timers.forEach(clearTimeout);timers=[];active=null;const b=$('#go5');b.textContent='▶ SCAN';b.classList.remove('stop');setState('Arrêté','');idle()}
 async function startLive(){
  const a=AS[A];
  if(a.src==='fh'&&!$('#fk').value.trim()){$('#kb').open=true;setState('Colle ta clé Finnhub (gratuite) ci-dessous','wait');return}
@@ -222,10 +241,30 @@ async function startLive(){
  const b=$('#go5');b.textContent='■ STOP';b.classList.add('stop');setState('Chargement des bougies 1 min…','wait');
  $('#sg').innerHTML='<div class="t" style="color:#f0b429;font-size:15px">⏳ Préparation…</div>';
  await seed();if(!run)return;
- setState('Connexion…','wait');connect(0);tk=setInterval(tick,1000);
+ setState('Connexion…','wait');connect(0);
+ try{tw=new Worker(URL.createObjectURL(new Blob(['setInterval(()=>postMessage(1),1000)'],{type:'text/javascript'})));tw.onmessage=tick;tw.onerror=()=>{tw=null;tk=setInterval(tick,1000)}}catch(e){tk=setInterval(tick,1000)}
+ keepAwake();
 }
 $('#go5').onclick=()=>run?stopLive():startLive();
-chips();stats();
+const today=()=>new Date().toISOString().slice(0,10);
+let G;try{G=JSON.parse(ls.g('gd1')||'')}catch(e){}
+if(!G||G.d!==today())G={d:today(),pnl:0,n:0,cl:0};
+$('#cap').value=ls.g('cap')||'';$('#lim').value=ls.g('lim')||'5';
+function gstate(){
+ if(G.d!==today())G={d:today(),pnl:0,n:0,cl:0};
+ const cap=+$('#cap').value||0,po=+$('#po').value||85,stake=Math.round(cap)>=0?Math.max(0,Math.round(cap*1)/100):0,lim=cap*(+$('#lim').value||5)/100;
+ return{cap,po,stake,lim,lock:cap>0&&(G.cl>=3||-G.pnl>=lim)}}
+function guard(){
+ const g=gstate();
+ $('#gd').innerHTML=!g.cap?'<div style="grid-column:1/-1"><b>Entre ton capital</b>pour calculer ta mise (1 %)</div>':
+ `<div><b>Mise conseillée (1 %)</b>${g.stake.toFixed(2)}</div><div><b>Résultat du jour</b><span class="${G.pnl>=0?'':'dn'}">${G.pnl>=0?'+':''}${G.pnl.toFixed(2)}</span> (${G.n} trades)</div><div><b>Pertes d'affilée</b>${G.cl}/3</div><div><b>Limite du jour</b>-${g.lim.toFixed(2)}</div>`+(g.lock?'<div class="verdict v-no" style="grid-column:1/-1">⛔ STOP pour aujourd\'hui. Ferme Pocket Option et reviens demain.</div>':'');
+ ls.s('gd1',JSON.stringify(G));ls.s('cap',$('#cap').value);ls.s('lim',$('#lim').value);
+}
+$('#cap').onchange=$('#lim').onchange=guard;
+$('#bw').onclick=()=>{const g=gstate();G.pnl+=g.stake*g.po/100;G.cl=0;G.n++;guard()};
+$('#bl').onclick=()=>{const g=gstate();G.pnl-=g.stake;G.cl++;G.n++;guard()};
+chips();stats();guard();
+setTimeout(()=>{if(!run)startLive()},400);
 
 // ---------- FOREX 1 min ----------
 const PAIRS=['EUR/USD'];
