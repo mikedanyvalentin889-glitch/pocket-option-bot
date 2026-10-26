@@ -24,13 +24,13 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:5px;borde
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--sell);margin-right:6px}.dot.on{background:var(--buy)}
 #log{max-height:170px;overflow:auto;font-size:12px}#log div{padding:4px 0;border-bottom:1px solid var(--ln)}
 </style></head><body><div class="w">
-<div class="f r"><div><h1>Scalp<span>Radar</span></h1><div class="s">Scanner 1 s · BUY / SELL / NO TRADE · aucune exécution automatique</div></div>
+<div class="f r"><div><h1>Scalp<span>Radar</span></h1><div class="s">Nouvelle analyse toutes les 3 s · BUY / SELL / NO TRADE · aucune exécution automatique</div></div>
 <div class="r"><span class="s"><i class="dot" id="dot"></i><span id="st">Connexion…</span></span>
-<input id="key" type="password" placeholder="Clé Twelve Data" aria-label="Clé Twelve Data" style="display:none;width:170px"><select id="pair" aria-label="Actif"></select>
+<select id="tf" aria-label="Unité de temps"><option value="60000">Bougies 1 min</option><option value="1000">Bougies 1 s</option></select><input id="key" type="password" placeholder="Clé Twelve Data" aria-label="Clé Twelve Data" style="display:none;width:170px"><select id="pair" aria-label="Actif"></select>
 <button id="stop">Arrêter</button></div></div>
 
 <section class="p"><div class="r"><div><div class="s" id="pn"></div><div class="px" id="px">—</div></div><div class="s" id="meta"></div></div><canvas id="cv"></canvas>
-<div class="s">Bougies 1 s clôturées uniquement · lignes : EMA 9 (ambre), EMA 21 (bleu), EMA 50 (violet) · flèches = signaux émis en direct, jamais redessinés après coup</div></section>
+<div class="s">Dernière bougie = en cours (signal provisoire, non confirmé à la clôture) · lignes : EMA 9 (ambre), EMA 21 (bleu), EMA 50 (violet) · flèches = signaux émis en direct, jamais redessinés après coup</div></section>
 
 <section class="p"><div id="sig"><div class="s">Dernière analyse</div><div class="b" id="sg">NO TRADE</div><div class="s" id="state"></div>
 <div class="s">Score de qualité : <b id="sc">0</b>/100 (conditions remplies, <u>pas</u> une probabilité de gain)</div></div>
@@ -45,8 +45,8 @@ Délai<input class="n" id="dl" type="number" min="0" value="1">s Paiement<input 
 <div class="s" id="kx" style="margin:6px 0"></div><canvas id="eq" style="height:90px"></canvas><div id="log"></div>
 <button id="rst" style="margin-top:6px">Remettre à zéro</button></section>
 
-<section class="p f"><div class="r"><h2>Backtest sur historique (crypto, bougies 1 s Binance)</h2><button id="bt">Lancer le backtest</button></div>
-<div class="s">Découpage chronologique 60 % développement / 20 % validation / 20 % test final. Entrée à l'ouverture de la seconde suivant le signal + délai, règlement au prix de la seconde d'expiration, trades sans chevauchement, paiement et délai du panneau ci-dessus. Référence naïve : suivre le sens de la dernière bougie.</div>
+<section class="p f"><div class="r"><h2>Backtest sur historique (crypto, données 1 s Binance)</h2><button id="bt">Lancer le backtest</button></div>
+<div class="s">Découpage chronologique 60 % développement / 20 % validation / 20 % test final. Entrée à l'ouverture de la seconde suivant le signal + délai, règlement au prix de la seconde d'expiration, trades sans chevauchement, paiement et délai du panneau ci-dessus. Stratégie simulée comme en direct : bougies 1 min (historique clôturé + bougie en cours), analyse toutes les 3 s, environ 5,5 h de données. Référence naïve : suivre le sens des 3 dernières secondes.</div>
 <div id="bto" class="s" style="margin:6px 0"></div><canvas id="beq" style="height:110px"></canvas></section>
 
 <details class="p f"><summary>Alertes Telegram (facultatif)</summary><div class="s" style="margin:8px 0">Token et chat ID restent dans ton navigateur (localStorage). Une alerte n'est envoyée que pour un nouveau signal valide, jamais en double.</div>
@@ -58,7 +58,7 @@ const $=id=>document.getElementById(id),PAIRS={BTCUSDT:'Bitcoin / USDT',ETHUSDT:
 const FXL=['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','USD/CHF','EUR/JPY','GBP/JPY','NZD/USD'];
 const sel=$('pair'),g1=document.createElement('optgroup'),g2=document.createElement('optgroup');g1.label='Crypto (24h/24)';g2.label='Forex (lun–ven)';
 for(const k in PAIRS)g1.appendChild(new Option(PAIRS[k],k));FXL.forEach(f=>g2.appendChild(new Option(f+' (Forex)','FX:'+f)));sel.append(g1,g2);
-let sym='BTCUSDT',C=[],ws=null,cur=null,pend=[],sigs=[],lastTick=0,lastT=0,lastSig='',tg=null,stopped=false,hb=null;
+let TF=60000,ps=[],lastTg={d:0,t:0},nextScan=0,sym='BTCUSDT',C=[],ws=null,cur=null,pend=[],sigs=[],lastTick=0,lastT=0,lastSig='',tg=null,stopped=false,hb=null;
 let S={a:[],log:[]};try{S=JSON.parse(localStorage.getItem('sr3'))||S}catch(e){}
 const save=()=>{try{localStorage.setItem('sr3',JSON.stringify(S))}catch(e){}},cfg=()=>({e:+$('exp').value,d:Math.max(0,+$('dl').value||0),p:(+$('pay').value||85)/100});
 const fx=()=>sym.startsWith('FX:'),fresh=()=>Date.now()-lastTick<(fx()?20000:4000),dg=v=>v>1000?2:v>50?3:5;
@@ -79,7 +79,7 @@ function ind(K){const n=K.length,c=K.map(x=>x.c),o=K.map(x=>x.o),h=K.map(x=>x.h)
  return{c,o,h,l,e9,e21,e50,mh,atr,rsi,adx,pdi,ndi,pb}}
 
 /* ---------- moteur de décision : BUY / SELL / NO TRADE ---------- */
-function decide(I,i){const r={d:0,sc:0,why:[],inv:[],blk:[],state:'Aucune configuration'};
+function decide(I,i,mm){const r={d:0,sc:0,why:[],inv:[],blk:[],state:'Aucune configuration'};
  if(i<60){r.blk.push('Historique insuffisant (60 bougies minimum)');return r}
  const{c,o,h,l}=I,a=I.atr[i],sl=I.atr.slice(Math.max(0,i-100),i),av=sl.reduce((x,y)=>x+y,0)/sl.length;
  let flat=true;for(let k=i-9;k<=i;k++)if(h[k]!==l[k])flat=false;
@@ -100,10 +100,11 @@ function decide(I,i){const r={d:0,sc:0,why:[],inv:[],blk:[],state:'Aucune config
  const l3=[i-2,i-1,i],lv2=U?Math.max(...h.slice(i-23,i-3)):Math.min(...l.slice(i-23,i-3));
  if(U&&Math.max(...l3.map(k=>h[k]))>lv2&&c[i]<lv2||D&&Math.min(...l3.map(k=>l[k]))<lv2&&c[i]>lv2)bad('Faux breakout détecté');
  const brk=U?c[i]>lv&&c[i-1]<=lv:c[i]<lv&&c[i-1]>=lv,pb=U?l3.some(k=>l[k]<=I.e21[k])&&c[i]>I.e9[i]:l3.some(k=>h[k]>=I.e21[k])&&c[i]<I.e9[i];
- brk?ok('Cassure du niveau '+lv.toFixed(dg(lv))+' confirmée à la clôture',15):pb?ok('Rebond sur l\'EMA 21 dans le sens de la tendance',15):bad('Aucun déclencheur (ni cassure ni rebond)');
+ brk?ok('Cassure du niveau '+lv.toFixed(dg(lv))+' (bougie en cours, provisoire)',15):pb?ok('Rebond sur l\'EMA 21 dans le sens de la tendance',15):bad('Aucun déclencheur (ni cassure ni rebond)');
  const bd=Math.abs(c[i]-o[i]),eng=U?c[i]>o[i]&&c[i-1]<o[i-1]&&c[i]>=o[i-1]&&o[i]<=c[i-1]:c[i]<o[i]&&c[i-1]>o[i-1]&&c[i]<=o[i-1]&&o[i]>=c[i-1],
   uw=h[i]-Math.max(o[i],c[i]),lw=Math.min(o[i],c[i])-l[i],pin=U?lw>2*bd&&lw>2*uw:uw>2*bd&&uw>2*lw;
  if(eng||pin)ok('Chandelier de confirmation : '+(eng?'avalement':'pin bar'),10);
+ mm===s?r.why.push('Micro-élan : les 2 derniers pas de 3 s vont dans le sens de la tendance'):bad('Micro-élan 3 s absent (les 2 derniers pas de 3 s ne vont pas dans le sens de la tendance)');
  if(r.blk.length){r.state='Configuration insuffisamment confirmée';r.sc=Math.min(r.sc,59);return r}
  if(r.sc<60){r.blk.push('Score < 60');r.state='Configuration insuffisamment confirmée';return r}
  r.d=s;r.state=r.sc>=75?'Tendance confirmée':'Configuration potentielle';
@@ -116,7 +117,7 @@ function ren(r,I,i){const e=$('sig');e.className=r.d>0?'buy':r.d<0?'sell':'';$('
  $('why').innerHTML=(r.d?r.why:r.blk).map(x=>`<li>${x}</li>`).join('');$('inv').innerHTML=r.inv.map(x=>`<li>${x}</li>`).join('')||'<li class="s">—</li>';
  const f=(a,b)=>`<span>${a}</span><span>${b}</span>`,v=I.c[i];
  $('ind').innerHTML=f('EMA 9 / 21 / 50',[I.e9,I.e21,I.e50].map(x=>x[i].toFixed(dg(v))).join(' · '))+f('RSI(14)',I.rsi[i].toFixed(0))+f('MACD hist.',I.mh[i].toPrecision(2))+f('ATR(14)',I.atr[i].toPrecision(2))+f('ADX(14)',I.adx[i].toFixed(0))+f('Bollinger %B',I.pb[i].toFixed(2))}
-function ago(){const a=Date.now()-lastTick;$('meta').innerHTML=`${fx()?'Twelve Data':'Binance'} · 1 s · ${Intl.DateTimeFormat().resolvedOptions().timeZone}<br>Fraîcheur : <b class="${fresh()?'up':'dn'}">${lastTick?(a/1000).toFixed(1)+' s':'—'}</b>${fresh()?'':' · PÉRIMÉES : signaux suspendus'}`;
+function ago(){const a=Date.now()-lastTick;$('meta').innerHTML=`${fx()?'Twelve Data':'Binance'} · bougies ${TF===60000?'1 min':'1 s'} · prochain scan ${Math.max(0,Math.ceil((nextScan-Date.now())/1000))} s · ${Intl.DateTimeFormat().resolvedOptions().timeZone}<br>Fraîcheur : <b class="${fresh()?'up':'dn'}">${lastTick?(a/1000).toFixed(1)+' s':'—'}</b>${fresh()?'':' · PÉRIMÉES : signaux suspendus'}`;
  if(!fresh()&&lastTick){pend.forEach(p=>{S.log.unshift({t:p.t,s:sym,d:p.d,r:'annulé'});});pend=[];if(cur)ren({d:0,sc:0,why:[],inv:[],blk:['Données périmées ou connexion interrompue'],state:'Signaux suspendus'},cur.I,cur.cl.length-1)}}
 setInterval(ago,1000);
 function draw(){if(!cur)return;const cv=$('cv'),dp=devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;cv.width=W*dp;cv.height=H*dp;const x=cv.getContext('2d');x.scale(dp,dp);
@@ -138,24 +139,28 @@ function stats(){const a=S.a,n=a.filter(v=>v!==0).length,w=a.filter(v=>v>0).leng
  $('log').innerHTML=S.log.slice(0,40).map(h=>`<div>${new Date(h.t).toLocaleTimeString()} · ${h.s} · ${h.d>0?'BUY':'SELL'} · ${h.r==='annulé'?'annulé (données périmées)':h.r==='nul'?'nul':h.r==='gagné'?'<span class="up">gagné</span>':'<span class="dn">perdu</span>'}${h.e?` · entrée ${h.e}`:''}</div>`).join('')||'<span class="s">Les signaux et leurs résultats apparaîtront ici.</span>';eqc('eq',a)}
 
 /* ---------- signaux, règlement, alertes ---------- */
-function fire(r,k){const t=k.t,key=sym+'|'+t+'|'+r.d;if(key===lastSig)return;lastSig=key;const g={t,d:r.d,s:sym,p:k.c,t0:Date.now(),eP:null,tE:0};pend.push(g);sigs.push({t,d:r.d});sigs=sigs.slice(-60);
+function fire(r,k){const t=k.t;const g={t,d:r.d,s:sym,p:k.c,t0:Date.now(),eP:null,tE:0};pend.push(g);sigs.push({t,d:r.d});sigs=sigs.slice(-60);
  $('last').innerHTML=`Dernier signal : <b class="${r.d>0?'up':'dn'}">${r.d>0?'BUY':'SELL'}</b> ${PAIRS[sym]||sym.slice(3)} à ${new Date().toLocaleTimeString()} · prix observé ${k.c.toFixed(dg(k.c))} · ${r.state} · score ${r.sc}`;
- if(tg)fetch(`https://api.telegram.org/bot${tg.t}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:tg.c,text:`${r.d>0?'BUY':'SELL'} ${PAIRS[sym]||sym.slice(3)}\n${new Date().toLocaleString()} · 1 s · prix observé ${k.c.toFixed(dg(k.c))}\nScore ${r.sc}/100 (pas une probabilité)\nRaisons : ${r.why.join(' ; ')}\nInvalidation : ${r.inv.join(' ; ')}\nLimites : prix ≠ Pocket Option, résultats non garantis, aucune exécution automatique.`})}).catch(()=>{})}
+ if(tg&&(lastTg.d!==r.d||Date.now()-lastTg.t>30000)&&(lastTg={d:r.d,t:Date.now()}))fetch(`https://api.telegram.org/bot${tg.t}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:tg.c,text:`${r.d>0?'BUY':'SELL'} ${PAIRS[sym]||sym.slice(3)}\n${new Date().toLocaleString()} · ${TF===60000?'1 min':'1 s'} · prix observé ${k.c.toFixed(dg(k.c))}\nScore ${r.sc}/100 (pas une probabilité)\nRaisons : ${r.why.join(' ; ')}\nInvalidation : ${r.inv.join(' ; ')}\nLimites : prix ≠ Pocket Option, résultats non garantis, aucune exécution automatique.`})}).catch(()=>{})}
 function settle(p){const now=Date.now(),c=cfg();pend=pend.filter(g=>{
  if(!g.eP){if(now<g.t0+c.d*1000)return true;g.eP=p;g.tE=now;return true}
  if(now<g.tE+c.e*1000)return true;const res=p===g.eP?'nul':(g.d>0?p>g.eP:p<g.eP)?'gagné':'perdu';
  S.a.push(res==='nul'?0:res==='gagné'?c.p:-1);S.log.unshift({t:g.t0,s:g.s,d:g.d,r:res,e:g.eP.toFixed(dg(g.eP))});S.a=S.a.slice(-2000);S.log=S.log.slice(0,100);save();stats();return false})}
-function after(){if(!C.length)return;const c=C[C.length-1];$('px').textContent=c.c.toLocaleString('en-US',{maximumFractionDigits:dg(c.c)});settle(c.c);
- if(C.length<3)return;const cl=C.slice(-400,-1),I=ind(cl),i=cl.length-1;cur={I,cl};
- if(!fresh())return;const r=decide(I,i);ren(r,I,i);if(cl[i].t!==lastT){lastT=cl[i].t;if(r.d&&!pend.length)fire(r,cl[i])}draw()}
+function after(){if(!C.length)return;const c=C[C.length-1];$('px').textContent=c.c.toLocaleString('en-US',{maximumFractionDigits:dg(c.c)});settle(c.c);if(!cur)scan()}
+function scan(){nextScan=Date.now()+3000;if(C.length<3||!lastTick)return;const cl=C.slice(-400),I=ind(cl),i=cl.length-1;cur={I,cl};ps.push(cl[i].c);ps=ps.slice(-10);
+ if(!fresh()){ago();return}const L=ps.length,s1=L>2?Math.sign(ps[L-1]-ps[L-2]):0,s2=L>2?Math.sign(ps[L-2]-ps[L-3]):0,r=decide(I,i,s1&&s1===s2?s1:0);
+ ren(r,I,i);if(r.d&&!pend.length)fire(r,cl[i]);draw()}
+setInterval(scan,3000);
 
 /* ---------- flux de données ---------- */
-function pushTick(p,t){const n=C.length;if(n&&t<C[n-1].t)return;if(n&&C[n-1].t===t){const c=C[n-1];c.h=Math.max(c.h,p);c.l=Math.min(c.l,p);c.c=p;return}
- if(n){const pt=C[n-1].t,pc=C[n-1].c;for(let u=pt+1000;u<t&&u-pt<=60000;u+=1000)C.push({t:u,o:pc,h:pc,l:pc,c:pc})}
+function pushTick(p,t){t=Math.floor(t/TF)*TF;const n=C.length;if(n&&t<C[n-1].t)return;if(n&&C[n-1].t===t){const c=C[n-1];c.h=Math.max(c.h,p);c.l=Math.min(c.l,p);c.c=p;return}
+ if(n){const pt=C[n-1].t,pc=C[n-1].c;for(let u=pt+TF;u<t&&u-pt<=60*TF;u+=TF)C.push({t:u,o:pc,h:pc,l:pc,c:pc})}
  const o=C.length?C[C.length-1].c:p;C.push({t,o,h:Math.max(o,p),l:Math.min(o,p),c:p});if(C.length>500)C.shift()}
-async function start(){if(ws){ws.onclose=null;ws.close()}C=[];cur=null;pend=[];lastT=0;lastTick=0;if(stopped)return;$('key').style.display=fx()?'':'none';
+async function start(){if(ws){ws.onclose=null;ws.close()}C=[];cur=null;pend=[];ps=[];lastT=0;lastTick=0;if(stopped)return;$('key').style.display=fx()?'':'none';
  $('pn').textContent=sym.startsWith('FX:')?sym.slice(3)+' (Forex)':PAIRS[sym];$('st').textContent='Connexion…';$('dot').className='dot';const mine=sym;
  if(fx()){let key='';try{key=localStorage.getItem('sr_key')||''}catch(e){}if(!key){$('st').textContent='Entre ta clé Twelve Data';return}
+  if(TF===60000){try{const j=await(await fetch('https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(mine.slice(3))+'&interval=1min&outputsize=150&timezone=UTC&apikey='+encodeURIComponent(key))).json();if(sym!==mine)return;
+   if(j.values)C=j.values.reverse().map(v=>({t:Date.parse(v.datetime.replace(' ','T')+'Z'),o:+v.open,h:+v.high,l:+v.low,c:+v.close}));else $('st').textContent='Twelve Data historique : '+(j.message||'refusé')}catch(e){}}
   ws=new WebSocket('wss://ws.twelvedata.com/v1/quotes/price?apikey='+encodeURIComponent(key));
   ws.onopen=()=>{ws.send(JSON.stringify({action:'subscribe',params:{symbols:mine.slice(3)}}));$('st').textContent='Connecté, en attente de ticks';$('dot').className='dot on'};
   ws.onmessage=m=>{let j;try{j=JSON.parse(m.data)}catch(e){return}
@@ -164,8 +169,8 @@ async function start(){if(ws){ws.onclose=null;ws.close()}C=[];cur=null;pend=[];l
    else if(j.status==='error'||j.event==='error')$('st').textContent='Twelve Data : '+(j.message||'erreur')};
   ws.onclose=()=>{$('dot').className='dot';setTimeout(()=>{if(sym===mine&&!stopped)start()},5000)};ws.onerror=()=>ws.close();
   clearInterval(hb);hb=setInterval(()=>{try{ws.readyState===1&&ws.send(JSON.stringify({action:'heartbeat'}))}catch(e){}},10000);return}
- try{const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=1s&limit=120`),j=await r.json();C=j.map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4]}))}catch(e){}
- ws=new WebSocket(`wss://stream.binance.com:9443/ws/${sym.toLowerCase()}@kline_1s`);
+ try{const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${TF===60000?'1m':'1s'}&limit=200`),j=await r.json();C=j.map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4]}))}catch(e){}
+ ws=new WebSocket(`wss://stream.binance.com:9443/ws/${sym.toLowerCase()}@kline_${TF===60000?'1m':'1s'}`);
  ws.onopen=()=>{$('st').textContent='En direct';$('dot').className='dot on'};
  ws.onmessage=m=>{const k=JSON.parse(m.data).k,c={t:k.t,o:+k.o,h:+k.h,l:+k.l,c:+k.c},n=C.length;lastTick=Date.now();if(n&&C[n-1].t===c.t)C[n-1]=c;else{C.push(c);if(C.length>500)C.shift()}after()};
  ws.onclose=()=>{$('st').textContent='Reconnexion…';$('dot').className='dot';setTimeout(()=>{if(sym===mine&&!stopped)start()},2000)};ws.onerror=()=>ws.close()}
@@ -175,17 +180,22 @@ function run(H,dirOf,ex,dl,pay){const n=H.length,out=[[],[],[]];let nx=60;for(le
  const g=i<n*.6?0:i<n*.8?1:2,ti=H[x].o===H[e].o;out[g].push(ti?0:(d>0?H[x].o>H[e].o:H[x].o<H[e].o)?pay:-1);nx=x+1}return out}
 const cell=a=>{const n=a.filter(v=>v!==0).length,w=a.filter(v=>v>0).length,[lo,hi]=wil(w,n);return n?`${n} · ${Math.round(w/n*100)}% <span class="s">[${Math.round(lo*100)}–${Math.round(hi*100)}]</span>${n<100?' <span class="wa">*</span>':''}`:'0'};
 $('bt').onclick=async()=>{const o=$('bto');if(fx()){o.textContent='Backtest indisponible pour le forex (pas d\'historique 1 s gratuit). Choisis une paire crypto.';return}
- try{let H=[],end='';for(let p=0;p<8;p++){const j=await(await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=1s&limit=1000${end}`)).json();if(!Array.isArray(j)||!j.length)break;
-  H=j.map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4]})).concat(H);end='&endTime='+(j[0][0]-1);o.textContent='Téléchargement… '+H.length+' bougies'}
-  if(H.length<500){o.textContent='Historique insuffisant.';return}
-  const I=ind(H),R=H.map((_,i)=>i<60?0:decide(I,i).d),c=cfg();let t=`<table><tr><th>Expiration</th><th>Développement</th><th>Validation</th><th>Test final</th><th>Espérance test</th><th>Réf. naïve (test)</th></tr>`,sel2=null;
-  [3,5,10,30,60].forEach(ex=>{const a=run(H,i=>R[i],ex,c.d,c.p),b=run(H,i=>Math.sign(H[i].c-H[i].o),ex,c.d,c.p),te=a[2],nn=te.filter(v=>v!==0).length;
+ try{let H=[],end='';for(let p=0;p<20;p++){const j=await(await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=1s&limit=1000${end}`)).json();if(!Array.isArray(j)||!j.length)break;
+  H=j.map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4]})).concat(H);end='&endTime='+(j[0][0]-1);o.textContent='Téléchargement… '+H.length+' secondes'}
+  if(H.length<8000){o.textContent='Historique insuffisant.';return}
+  const n=H.length,c=cfg(),sg=new Array(n).fill(0);let M=[],f=null,mk=-1;
+  for(let j=0;j<n;j++){const x=H[j],b=Math.floor(x.t/60000);if(b!==mk){if(f)M.push(f);f=null;mk=b}
+   f=f?{t:f.t,o:f.o,h:Math.max(f.h,x.h),l:Math.min(f.l,x.l),c:x.c}:{t:b*60000,o:x.o,h:x.h,l:x.l,c:x.c};
+   if(j%3===0&&j>=6&&M.length>=60){const K=M.slice(-200).concat(f),s1=Math.sign(x.c-H[j-3].c),s2=Math.sign(H[j-3].c-H[j-6].c);sg[j]=decide(ind(K),K.length-1,s1&&s1===s2?s1:0).d}
+   if(j%600===0){o.textContent='Analyse… '+Math.round(j/n*100)+'%';await new Promise(r=>setTimeout(r))}}
+  let t=`<table><tr><th>Expiration</th><th>Développement</th><th>Validation</th><th>Test final</th><th>Espérance test</th><th>Réf. naïve (test)</th></tr>`,sel2=null;
+  [3,5,10,30,60].forEach(ex=>{const a=run(H,i=>sg[i],ex,c.d,c.p),b=run(H,i=>i%3===0&&i>=3?Math.sign(H[i].c-H[i-3].c):0,ex,c.d,c.p),te=a[2],nn=te.filter(v=>v!==0).length;
    if(ex===c.e)sel2=[...a[0],...a[1],...a[2]];t+=`<tr><td>${ex}s</td><td>${cell(a[0])}</td><td>${cell(a[1])}</td><td>${cell(a[2])}</td><td>${nn?(te.reduce((x,y)=>x+y,0)/te.length).toFixed(3):'—'}</td><td>${cell(b[2])}</td></tr>`});
-  const d0=new Date(H[0].t).toLocaleString(),d1=new Date(H[H.length-1].t).toLocaleString();
-  o.innerHTML=`${H.length} bougies 1 s du ${d0} au ${d1} (≈ ${(H.length/3600).toFixed(1)} h, un seul régime de marché).<br>Format : trades · réussite [IC 95 %]. <span class="wa">*</span> = échantillon &lt; 100, non concluant. Seuil de rentabilité à ${Math.round(c.p*100)}% de paiement : ${(100/(1+c.p)).toFixed(1)}%.`+t+`</table>Courbe de capital (expiration ${c.e}s, dév.→validation→test) · pertes d'affilée max : ${sel2?streak(sel2):'—'}`;eqc('beq',sel2||[])}
- catch(e){o.textContent='Erreur de téléchargement : '+e.message}};
+  o.innerHTML=`${n} secondes du ${new Date(H[0].t).toLocaleString()} au ${new Date(H[n-1].t).toLocaleString()} (≈ ${(n/3600).toFixed(1)} h, un seul régime de marché).<br>Format : trades · réussite [IC 95 %]. <span class="wa">*</span> = échantillon &lt; 100, non concluant. Seuil de rentabilité à ${Math.round(c.p*100)}% de paiement : ${(100/(1+c.p)).toFixed(1)}%.`+t+`</table>Courbe de capital (expiration ${c.e}s, dév.→validation→test) · pertes d'affilée max : ${sel2?streak(sel2):'—'}`;eqc('beq',sel2||[])}
+ catch(e){o.textContent='Erreur : '+e.message}};
 
 /* ---------- commandes ---------- */
+$('tf').onchange=e=>{TF=+e.target.value;sigs=[];start()};
 sel.onchange=()=>{sym=sel.value;sigs=[];start()};
 $('stop').onclick=e=>{stopped=!stopped;e.target.textContent=stopped?'Reprendre':'Arrêter';if(stopped){ws&&(ws.onclose=null,ws.close());$('st').textContent='Arrêté';$('dot').className='dot';pend=[]}else start()};
 $('rst').onclick=()=>{S={a:[],log:[]};save();stats()};
