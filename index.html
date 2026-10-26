@@ -1,312 +1,1673 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Scan Pro</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;background:#0e1217;color:#e8edf2;font:14px system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-#app{width:100%;max-width:520px;margin:0 auto;padding:10px}
-.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-button,input{font:inherit;border-radius:8px;border:1px solid #2c3644;background:#1a212b;color:inherit;padding:7px 10px}
-button{cursor:pointer}
-.tabs{display:flex;gap:6px;margin-bottom:10px}.tabs button{flex:1;font-size:13px}.tabs .on{background:#2f6bff;border-color:#2f6bff;color:#fff}
-.big{width:100%;padding:13px;font-size:17px;font-weight:800;letter-spacing:1px;background:#2f6bff;border-color:#2f6bff;color:#fff}
-.big.stop{background:#3a2327;border-color:#6b2a33;color:#ff8a94}.big:disabled{opacity:.6}
-.card{background:#161c24;border:1px solid #232d3a;border-radius:12px;padding:12px;margin-top:10px;text-align:center}
-.card.up{background:rgba(31,191,117,.15);border-color:#1fbf75}.card.dn{background:rgba(240,68,82,.15);border-color:#f04452}
-.cr{display:flex;justify-content:space-between;gap:6px;font-size:12px;padding:3px 0;border-bottom:1px solid #1d2630}.cr b.g{color:#1fbf75}.cr b.r{color:#6b7785}
-.tvw{width:100%;height:360px;border:0;border-radius:8px;margin-top:6px;background:#0e1217}
-.chips{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}.chips button{flex:1;font-size:12px;padding:6px 4px}.chips .on{border-color:#2f6bff;color:#7aa2ff;background:#16233f}
-.sig{display:flex;align-items:center;justify-content:center;gap:12px;min-height:84px}
-.sig svg{width:68px;height:68px}.sig .t{font-size:22px;font-weight:900}.sig small{display:block;font-size:12px;font-weight:400;color:#9aa7b4}
-.up .t{color:#1fbf75}.dn .t{color:#f04452}
-.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#555;margin-right:6px}
-.dot.on{background:#1fbf75;animation:p 1s infinite}.dot.wait{background:#f0b429;animation:p .6s infinite}
-@keyframes p{50%{opacity:.25}}
-.st{font-size:12.5px;color:#9aa7b4;margin-top:8px;text-align:left}
-.bar{height:6px;background:#232d3a;border-radius:3px;overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;background:#2f6bff;transition:width .4s}
-.meter{display:flex;gap:3px;margin-top:8px}.meter b{flex:1;height:8px;border-radius:2px;background:#232d3a}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;text-align:left}
-.grid div{background:#1a212b;border-radius:8px;padding:6px 8px;font-size:12px}.grid b{display:block;font-size:11px;color:#8b98a5;font-weight:600}
-.verdict{margin-top:8px;padding:8px;border-radius:8px;font-weight:700;font-size:13px;text-align:left}
-.v-ok{background:rgba(31,191,117,.15);color:#1fbf75}.v-no{background:rgba(240,68,82,.15);color:#f04452}.v-w{background:rgba(240,180,41,.15);color:#f0b429}
-.dots{display:flex;gap:3px;margin-top:8px;flex-wrap:wrap}.dots i{width:12px;height:12px;border-radius:3px}
-.row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;margin-top:6px;background:#161c24}
-.row.up{background:rgba(31,191,117,.14)}.row.dn{background:rgba(240,68,82,.14)}.row.weak{opacity:.55}
-.row svg{width:32px;height:32px;flex:none}.row .n{flex:1;font-weight:700}.row .n small{display:block;color:#8b98a5;font-weight:400;font-size:11px}
-.row .l{font-weight:800;font-size:12.5px;text-align:right}.up .l{color:#1fbf75}.dn .l{color:#f04452}
-#msg{margin-top:8px;font-size:12.5px;color:#f0b429}
-details{margin-top:10px;font-size:12.5px;color:#8b98a5}details input{width:68%}
-.foot{margin-top:10px;font-size:11px;color:#6b7785;line-height:1.4}
-#ph{display:none;text-align:center;color:#8b98a5;padding:30px}
-</style>
-</head>
-<body>
-<p id="ph">Le scan est dans la petite fenêtre. Ferme-la pour le ramener ici.</p>
-<div id="app">
- <div class="top"><b>📡 SCAN PRO</b><button id="pin" title="Petite fenêtre flottante">📌</button></div>
- <div class="tabs"><button id="t1" class="on">⚡ Live 3 s</button><button id="t2">EUR/USD 1 min</button></div>
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+SCANNER DE MARCHÉ — analyse technique, signaux BUY / SELL / NO TRADE, backtesting honnête.
+==========================================================================================
 
- <section id="live">
-  <div class="chips" id="ch"></div>
-  <button id="go5" class="big">▶ SCAN</button>
-  <div class="card" id="sc">
-   <div class="sig" id="sg"><div class="t" style="color:#8b98a5;font-size:15px">Appuie sur SCAN</div></div>
-   <div class="meter" id="mt"></div>
-   <div class="bar"><i id="pb" style="width:0"></i></div>
-   <div class="st"><span class="dot" id="dt"></span><span id="stt">Arrêté</span></div>
-  </div>
-  <div class="card" style="text-align:left">
-   <details open><summary><b>📈 Graphique 1 min (TradingView)</b></summary>
-   <iframe id="tv" class="tvw" title="Graphique" allowfullscreen></iframe>
-   <div style="font-size:11px;color:#6b7785;margin-top:4px">Même type de graphique que les plateformes de trading : zoom, indicateurs, outils de dessin. Les prix peuvent différer un peu de Pocket Option.</div></details>
-  </div>
-  <div class="card" style="text-align:left">
-   <b>🕯 Bougie 1 min en direct</b> <small id="ct" style="color:#8b98a5"></small>
-   <canvas id="cv" height="90" style="width:100%;height:90px;margin-top:6px"></canvas>
-  </div>
-  <div class="card" style="text-align:left">
-   <b>🧪 Indicateurs testés en direct</b><div style="font-size:11px;color:#8b98a5;margin:2px 0 6px">Seuls ceux qui prouvent leur efficacité sont utilisés. Les autres sont coupés.</div><div id="cp"></div>
-  </div>
-  <div class="card" style="text-align:left">
-   <b>🎯 Précision mesurée · <span id="an"></span></b>
-   <div class="grid"><div><b>Signaux testés</b><span id="sn">0</span></div><div><b>Réussite</b><span id="sr">–</span></div><div><b>Seuil pour ne pas perdre</b><span id="sb">–</span></div><div><b>Réussite sûre (95 %)</b><span id="sl">–</span></div></div>
-   <div class="verdict v-w" id="vd">Calibrage : lance le scan et laisse-le tourner.</div>
-   <div class="dots" id="ds"></div>
-   <div style="margin-top:8px;font-size:12px;color:#8b98a5">Délai clic (s) <input id="dl" type="number" value="1" min="0" max="5" style="width:52px"> · Payout % <input id="po" type="number" value="85" min="50" max="100" style="width:64px"> <button id="rs">Remettre à zéro</button></div>
-  </div>
-  <div class="card" style="text-align:left">
-   <b>🛡 Garde-fou (argent réel)</b>
-   <div style="margin-top:6px;font-size:12px;color:#8b98a5">Capital sur le compte <input id="cap" type="number" min="0" placeholder="ex. 50" style="width:80px"> · Perte max du jour <input id="lim" type="number" value="5" min="1" max="20" style="width:52px"> %</div>
-   <div class="grid" id="gd"></div>
-   <div style="display:flex;gap:6px;margin-top:8px"><button id="bw" style="flex:1">✅ J'ai gagné</button><button id="bl" style="flex:1">❌ J'ai perdu</button></div>
-   <div style="font-size:11px;color:#6b7785;margin-top:6px">Appuie après chaque trade que TU as pris. Stop automatique après 3 pertes d'affilée ou à la limite du jour.</div>
-  </div>
- </section>
+Fichier UNIQUE. Aucune exécution automatique de transactions. Aucun accès aux fonds.
+Aucun profit n'est promis : l'outil sert à MESURER si une règle a un avantage, pas à en prétendre un.
 
- <section id="fx" hidden>
-  <button id="scan" class="big">SCAN</button>
-  <div id="msg"></div><div id="list"></div>
- </section>
+AVERTISSEMENTS IMPORTANTS
+-------------------------
+* Pocket Option ne publie pas d'API officielle documentée (vérifié lors de la conception).
+  Ce projet NE se connecte PAS à Pocket Option, ne demande JAMAIS d'identifiants ni de SSID.
+  Les données arrivent par : (1) fichier CSV, (2) Twelve Data (API officielle d'un fournisseur,
+  clé API personnelle dans .env — marché FX réel, PAS les prix OTC synthétiques du courtier).
+* Les prix « OTC » d'un courtier sont ses propres séries synthétiques. Une stratégie validée sur
+  du FX réel n'est PAS validée sur de l'OTC, et inversement.
+* Le score de qualité (0-100) est un score de règles, PAS une probabilité de gain.
+* En options binaires, il faut un taux de réussite > 1/(1+paiement) pour ne pas perdre
+  (ex. paiement 85 % -> 54,1 %). Un résultat « aucun avantage détecté » est un résultat valide.
+* Les résultats sur données synthétiques (commande demo-data) n'ont AUCUNE valeur de performance.
+* Le connecteur Twelve Data n'a pas pu être testé contre le service réel (pas d'accès réseau
+  pendant le développement) : seul son décodage de réponse est testé. Vérifie-le avec ta clé.
+* Le module d'apprentissage automatique n'est volontairement PAS inclus : il ne se justifie
+  qu'après qu'une stratégie de référence transparente ait montré un avantage hors échantillon.
 
- <details id="kb"><summary>Clés gratuites</summary>
-  <input id="fk" placeholder="Clé Finnhub (live forex / Apple)"> <button id="sf">OK</button>
-  <div style="margin-bottom:8px">finnhub.io → Register. Pour le live EUR/USD, USD/JPY, AAPL.</div>
-  <input id="key" placeholder="Clé Twelve Data (onglet Forex 1 min)"> <button id="sv">OK</button>
-  <div>twelvedata.com · les clés restent dans ton navigateur.</div></details>
- <div class="foot">Signaux techniques : <b>pas un conseil financier</b>. SOL : Binance (24h/24). EUR/USD, USD/JPY : forex fermé du vendredi soir au dimanche soir ; Apple : heures de Bourse US. Rien ne garantit un gain ; à 3 s le résultat est proche du hasard. Le scan mesure sa propre précision (avec ton délai de clic) et te dit quand ne PAS trader. Les bougies 1 min sont construites sur l'horloge de la bourse : la forme peut différer légèrement de ton graphique (autre source de prix). Les prix viennent de Binance, pas de Pocket Option : teste en démo.</div>
-</div>
-<script>
-const app=document.getElementById('app'),$=s=>app.querySelector(s);
-const ls={g:k=>{try{return localStorage.getItem(k)}catch(e){return null}},s:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
-const ARROW='<svg viewBox="0 0 24 24"><path d="M12 3l9 10h-6v8H9v-8H3z" fill="currentColor"/></svg>';
-$('#key').value=ls.g('tdk')||'';
-$('#fk').value=ls.g('fhk')||'';
-$('#sv').onclick=()=>{ls.s('tdk',$('#key').value.trim());msg('Clé enregistrée')};
-$('#sf').onclick=()=>{ls.s('fhk',$('#fk').value.trim())};
-const msg=t=>{$('#msg').textContent=t};
-function tab(n){$('#live').hidden=n!==1;$('#fx').hidden=n!==2;$('#t1').classList.toggle('on',n===1);$('#t2').classList.toggle('on',n===2);if(n===2&&!$('#key').value)$('#kb').open=true}
-$('#t1').onclick=()=>tab(1);$('#t2').onclick=()=>tab(2);
+INSTALLATION
+------------
+    python -m venv .venv && source .venv/bin/activate      # Windows : .venv\\Scripts\\activate
+    pip install numpy pandas streamlit plotly
+    python scanner.py init            # génère requirements.txt, .env.example, .gitignore, README.md
+    cp .env.example .env              # puis édite (clé Twelve Data / Telegram, facultatif)
 
-// ---------- indicateurs ----------
-const sma=(a,n)=>a.slice(-n).reduce((x,y)=>x+y,0)/n;
-function ema(a,n){const k=2/(n+1);let e=a[0];return a.map((v,i)=>i?(e=v*k+e*(1-k)):e)}
-function rsi(a,n=14){let g=0,l=0;for(let i=1;i<=n;i++){const d=a[i]-a[i-1];d>0?g+=d:l-=d}g/=n;l/=n;
- for(let i=n+1;i<a.length;i++){const d=a[i]-a[i-1];g=(g*(n-1)+Math.max(d,0))/n;l=(l*(n-1)+Math.max(-d,0))/n}return l===0?100:100-100/(1+g/l)}
-function score(c){
- const p=c.at(-1),s20=sma(c,20),s50=sma(c,50),R=rsi(c),e26=ema(c,26),m=ema(c,12).map((v,i)=>v-e26[i]),h=m.at(-1)-ema(m,9).at(-1);
- const w=c.slice(-20),mu=sma(c,20),sd=Math.sqrt(w.reduce((x,y)=>x+(y-mu)**2,0)/20),pb=sd?(p-(mu-2*sd))/(4*sd):.5;
- let s=(p>s50?1:-1)+(s20>s50?1:-1)+(h>0?1:-1);if(R<30)s++;else if(R>70)s--;if(pb<.05)s++;else if(pb>.95)s--;return{s,px:p}}
-const fmt=v=>v>=50?v.toFixed(3):v.toFixed(5);
+COMMANDES
+---------
+    python scanner.py test                                   # tests automatisés intégrés
+    python scanner.py demo-data --out demo.csv               # données SYNTHÉTIQUES (démo uniquement)
+    python scanner.py backtest --csv demo.csv --stage dev    # développement
+    python scanner.py backtest --csv demo.csv --stage val    # validation (périodes distinctes)
+    python scanner.py backtest --csv demo.csv --stage test --final   # test final (verrouillé, 1 config)
+    python scanner.py redundancy --csv demo.csv              # corrélation entre indicateurs
+    python scanner.py scan --csv demo.csv --as-of 2024-03-01T12:00:00   # un scan rejoué à une date
+    python scanner.py scan --provider twelvedata --loop      # scan temps réel (clé API requise)
+    streamlit run scanner.py                                 # tableau de bord
+    python scanner.py stop | resume                          # arrêt d'urgence (fichier STOP)
 
-// ---------- LIVE 3 s + bougies 1 min ----------
-const AS={SOL:{n:'SOL/USDT',src:'bn',sym:'solusdt',d:3,td:'',lo:2,hi:3000},EURUSD:{n:'EUR/USD',src:'fh',sym:'OANDA:EUR_USD',d:5,td:'EUR/USD',lo:.5,hi:2},USDJPY:{n:'USD/JPY',src:'fh',sym:'OANDA:USD_JPY',d:3,td:'USD/JPY',lo:50,hi:300},AAPL:{n:'Apple',src:'fh',sym:'AAPL',d:2,td:'AAPL',lo:20,hi:2000}};
-const TV={SOL:'BINANCE:SOLUSDT',EURUSD:'OANDA:EURUSD',USDJPY:'OANDA:USDJPY',AAPL:'NASDAQ:AAPL'};
-const HOR=3,WARM=20,NAMES=['Tendance 1 min (EMA 9/21)','Couleur de la bougie en cours','Micro-tendance 1 s','Élan sur 3 s','Flux acheteur / vendeur'];
-const DEL=()=>Math.max(0,Math.min(5,+$('#dl').value||0));
-let A=ls.g('asset');if(!AS[A])A='SOL';
-let tw=null,wl=null,cid=0,bad=0,ws=null,run=false,bars=[],cur={b:0,s:0,n:0},last=0,lastT=0,prevP=0,prevSide=0,t0=0,tk=null,active=null,cool=0,timers=[],fhErr='';
-let candles=[],off=0,sec=0,pxs=[],pend=[],CS=NAMES.map(()=>({n:0,w:0}));
-let ST={};try{ST=JSON.parse(ls.g('st7')||'{}')||{}}catch(e){}
-const S=()=>ST[A]||(ST[A]={n:0,w:0,h:[]});
-const save=()=>ls.s('st7',JSON.stringify(ST));
-function tvChart(){$('#tv').src='https://s.tradingview.com/widgetembed/?symbol='+encodeURIComponent(TV[A])+'&interval=1&theme=dark&style=1&locale=fr&timezone=Etc%2FUTC&withdateranges=1&hide_side_toolbar=0&allow_symbol_change=0&saveimage=0&studies=%5B%5D'}
-function chips(){tvChart();$('#ch').innerHTML=Object.keys(AS).map(k=>`<button data-k="${k}" class="${k===A?'on':''}">${AS[k].n}</button>`).join('');$('#an').textContent=AS[A].n}
-$('#ch').onclick=e=>{const k=e.target.dataset.k;if(!k||k===A)return;const was=run;if(was)stopLive();A=k;ls.s('asset',k);chips();stats();idle();if(was)startLive()};
-function setState(t,c){$('#stt').textContent=t;$('#dt').className='dot '+(c||'')}
-function idle(){$('#sc').className='card';$('#sg').innerHTML='<div class="t" style="color:#8b98a5;font-size:15px">Appuie sur SCAN</div>';$('#mt').innerHTML='';$('#pb').style.width='0';candles=[];last=0;bad=0;$('#ct').textContent='';$('#cp').innerHTML='';drawC()}
-function onTick(p,q,side,ts){
- if(!(p>=AS[A].lo&&p<=AS[A].hi)){bad=p;return}
- last=p;lastT=Date.now();ts=ts||lastT;off=off?off*.9+(ts-lastT)*.1:ts-lastT;
- const m=Math.floor(ts/60000)*60000,k=candles.at(-1);
- if(!k||m>k.t){candles.push({t:m,o:p,h:p,l:p,c:p});if(candles.length>90)candles.shift()}
- else if(m===k.t){k.h=Math.max(k.h,p);k.l=Math.min(k.l,p);k.c=p}
- if(!side)side=p>prevP?1:p<prevP?-1:prevSide;if(side)prevSide=side;prevP=p;side>0?cur.b+=q:cur.s+=q;cur.n++}
-async function seed(){
- const a=AS[A];
- try{
-  if(a.src==='bn'){const j=await jget('https://data-api.binance.vision/api/v3/klines?symbol=SOLUSDT&interval=1m&limit=60');if(Array.isArray(j))candles=j.map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4]}))}
-  else if($('#key').value.trim()){const j=await jget(`https://api.twelvedata.com/time_series?symbol=${a.td}&interval=1min&outputsize=60&timezone=UTC&apikey=${$('#key').value.trim()}`);
-   if(j.values)candles=j.values.slice().reverse().map(x=>({t:Date.parse(x.datetime.replace(' ','T')+'Z'),o:+x.open,h:+x.high,l:+x.low,c:+x.close}))}
- }catch(e){}
-}
-function connect(u){
- const a=AS[A],my=++cid;let url;
- if(a.src==='bn')url=['wss://stream.binance.com:9443/ws/','wss://data-stream.binance.vision/ws/'][u%2]+a.sym+'@trade';
- else url='wss://ws.finnhub.io?token='+encodeURIComponent($('#fk').value.trim());
- ws=new WebSocket(url);
- ws.onopen=()=>{if(a.src==='fh')ws.send(JSON.stringify({type:'subscribe',symbol:a.sym}));setState('Connecté · en attente des prix…','wait')};
- ws.onmessage=e=>{if(my!==cid)return;const d=JSON.parse(e.data);
-  if(a.src==='bn')onTick(+d.p,+d.q,d.m?-1:1,d.T);
-  else if(d.type==='trade')d.data.forEach(x=>{if(x.s===a.sym)onTick(+x.p,+x.v||1,0,x.t)});
-  else if(d.type==='error')fhErr=d.msg||'erreur'};
- ws.onclose=()=>{if(run&&my===cid){setState('Reconnexion…','wait');setTimeout(()=>run&&my===cid&&connect(u+1),2500)}};
- ws.onerror=()=>{try{ws.close()}catch(e){}};
-}
-function comps(){
- const C=candles.map(x=>x.c),k=candles.at(-1),P=bars.map(x=>x.p),o=[0,0,0,0,0];
- if(C.length>=22)o[0]=ema(C,9).at(-1)>ema(C,21).at(-1)?1:-1;
- if(k&&k.c!==k.o)o[1]=k.c>k.o?1:-1;
- o[2]=ema(P,5).at(-1)>ema(P,20).at(-1)?1:-1;
- o[3]=Math.sign(P.at(-1)-P.at(-1-HOR));
- const L=bars.slice(-10),b=L.reduce((x,y)=>x+y.b,0),v=L.reduce((x,y)=>x+y.s,0),imb=b+v?(b-v)/(b+v):0;
- o[4]=imb>.25?1:imb<-.25?-1:0;return{o,imb}}
-function drawC(){
- const cv=$('#cv'),W=cv.clientWidth||320,H=90;cv.width=W;cv.height=H;const x=cv.getContext('2d');x.clearRect(0,0,W,H);
- const L=candles.slice(-30);if(!L.length)return;
- const mn=Math.min(...L.map(c=>c.l)),mx=Math.max(...L.map(c=>c.h)),r=mx-mn||1,Y=v=>H-4-(v-mn)/r*(H-8),w=W/L.length;
- L.forEach((c,i)=>{const cx=i*w+w/2,col=c.c>=c.o?'#1fbf75':'#f04452';x.strokeStyle=col;x.fillStyle=col;x.beginPath();x.moveTo(cx,Y(c.h));x.lineTo(cx,Y(c.l));x.stroke();const t=Y(Math.max(c.o,c.c)),b=Y(Math.min(c.o,c.c));x.fillRect(cx-w*.3,t,w*.6,Math.max(1,b-t))})}
-function tick(){
- const age=Date.now()-lastT;
- if(!last&&bad){setState(`⚠️ Prix inattendu (${bad}) pour ${AS[A].n} : flux ignoré`,'wait');return}
- if(!last||age>10000){
-  const x=last?`Aucun prix depuis ${Math.round(age/1000)} s`:(Date.now()-t0>10000?'Aucun prix reçu':'En attente du premier prix…');
-  setState('⚠️ '+x+' · marché fermé ?'+(fhErr?' ('+fhErr+')':''),'wait');return}
- sec++;pxs[sec]=last;bars.push({p:last,b:cur.b,s:cur.s,n:cur.n});if(bars.length>120)bars.shift();
- const tps=cur.n;cur={b:0,s:0,n:0};
- const k=candles.at(-1),rem=Math.ceil(60-((Date.now()+off)/1000)%60),d=DEL(),dp=AS[A].d;
- if(k){$('#ct').textContent=`· ${AS[A].n} · O ${k.o.toFixed(dp)} H ${k.h.toFixed(dp)} L ${k.l.toFixed(dp)} C ${k.c.toFixed(dp)} · ⏱ ${rem} s`;drawC()}
- while(pend.length&&pend[0].s+d+HOR<=sec){const q=pend.shift(),y=Math.sign(pxs[q.s+d+HOR]-pxs[q.s+d]);
-  if(y)q.c.forEach((v,i)=>{if(v){CS[i].n=CS[i].n*.998+1;CS[i].w=CS[i].w*.998+(v===y?1:0)}})}
- if(bars.length<WARM){$('#pb').style.width=(bars.length/WARM*100)+'%';setState(`Collecte des prix ${bars.length}/${WARM} s`,'wait');return}
- const C=comps();pend.push({s:sec,c:C.o});
- const act=CS.map(c=>c.n>=60&&wilson(c.w/4,c.n/4)>50),nz=C.o.map((v,i)=>act[i]?v:0),sc=nz.reduce((a,b)=>a+b,0),na=nz.filter(v=>v).length,nact=act.filter(Boolean).length;
- $('#cp').innerHTML=NAMES.map((n,i)=>{const c=CS[i];return `<div class="cr"><span>${n}</span><span>${c.n>=10?(c.w/c.n*100).toFixed(0)+' %':'…'}</span><b class="${act[i]?'g':'r'}">${act[i]?'ACTIF':'COUPÉ'}</b></div>`}).join('');
- $('#pb').style.width=active?Math.min(100,(Date.now()-active.t)/((d+HOR)*10))+'%':'100%';
- $('#mt').innerHTML=[-3,-2,-1,0,1,2,3].map(v=>`<b style="${Math.max(-3,Math.min(3,sc))===v?'background:'+(v>0?'#1fbf75':v<0?'#f04452':'#8b98a5'):''}"></b>`).join('');
- if(active){setState(`Signal en cours · résultat dans ${Math.max(0,Math.ceil((active.t+(d+HOR)*1000-Date.now())/1000))} s`,'on');return}
- setState(`Analyse ${AS[A].n} · ${tps} ticks/s · ${last.toFixed(dp)}`,'on');
- $('#sc').className='card';
- const msgs=nact===0?(sec<120?`calibrage des indicateurs… ${sec}/120 s`:'indicateurs non prouvés : les directions sont des paris'):`${nact}/5 indicateurs fiables · bougie ${k&&k.c>=k.o?'verte':'rouge'}`;
- $('#sg').innerHTML=`<div class="t" style="color:#9aa7b4;font-size:17px">🔍 ANALYSE…<small>${msgs}</small></div>`;
- const R=candles.length>15?rsi(candles.map(x=>x.c)):50,tr=bars.slice(-10).reduce((a,b)=>a+b.n,0)/10;
- const good=na>=2&&Math.abs(sc)===na&&tr>=1&&!(sc>0&&R>75)&&!(sc<0&&R<25),all=C.o.reduce((a,b)=>a+b,0);
- if(gstate().lock){$('#sc').className='card dn';$('#sg').innerHTML='<div class="t" style="color:#f04452;font-size:17px">⛔ STOP POUR AUJOURD\'HUI<small>Limite atteinte : reviens demain</small></div>'}
- else if(Date.now()>cool){if(good)fire(sc>0?1:-1,true);else if(Math.abs(all)>=2)fire(all>0?1:-1,false)}
-}
-function fire(dir,good){
- const d=DEL(),a=active={d:dir,t:Date.now(),entry:0,id:A},v=verdict(),ok=v.k==='ok';cool=Date.now()+(d+HOR+3)*1000;
- $('#sc').className='card '+(dir>0?'up':'dn');
- $('#sg').innerHTML=`<span style="color:${dir>0?'#1fbf75':'#f04452'};display:flex;opacity:${good&&ok?1:.8};${dir<0?'transform:rotate(180deg)':''}">${ARROW}</span><div class="t">${dir>0?'ACHETER':'VENDRE'}<small>${(dir>0?'HAUT ▲':'BAS ▼')+' · '+(good&&ok?'✅ signal fiable':good?'⚠️ signal non vérifié':'⚠️ PARI faible confiance')+' · '+HOR+' s'}</small></div>`;
- timers.push(setTimeout(()=>{a.entry=last},d*1000));
- timers.push(setTimeout(()=>{
-  if(a.entry&&last!==a.entry){const w=(last>a.entry)===(dir>0),s=ST[a.id]||(ST[a.id]={n:0,w:0,h:[]});s.n++;if(w)s.w++;s.h.push(w?1:0);if(s.h.length>24)s.h.shift();save()}
-  active=null;stats()},(d+HOR)*1000));
-}
-function wilson(w,n){if(!n)return 0;const z=1.96,p=w/n;return(p+z*z/(2*n)-z*Math.sqrt((p*(1-p)+z*z/(4*n))/n))/(1+z*z/n)*100}
-function verdict(){
- const s=S(),po=+$('#po').value||85,be=100/(1+po/100),n=s.n,r=n?s.w/n*100:0,lb=wilson(s.w,n);let k,t;
- if(n<100){k='w';t=`Calibrage : ${n}/100 signaux. Ne trade PAS en réel avant.`}
- else if(lb>=be){k='ok';t='✅ Avantage probable mesuré. Reste prudent (petites mises).'}
- else if(r<be){k='no';t='⛔ Précision sous le seuil : ne trade pas, tu perdrais de l\'argent.'}
- else{k='w';t='⚠️ Pas de preuve d\'avantage : attends plus de signaux.'}
- return{k,t,be,n,r,lb,h:s.h}}
-function stats(){
- const v=verdict();
- $('#sn').textContent=v.n;$('#sr').textContent=v.n?v.r.toFixed(1)+' %':'–';$('#sb').textContent=v.be.toFixed(1)+' %';$('#sl').textContent=v.n?v.lb.toFixed(1)+' %':'–';
- const e=$('#vd');e.className='verdict '+(v.k==='ok'?'v-ok':v.k==='no'?'v-no':'v-w');e.textContent=v.t;
- $('#ds').innerHTML=v.h.map(x=>`<i style="background:${x?'#1fbf75':'#f04452'}"></i>`).join('');
-}
-$('#po').onchange=stats;
-$('#rs').onclick=()=>{if(confirm('Remettre à zéro les stats de '+AS[A].n+' ?')){ST[A]={n:0,w:0,h:[]};save();stats()}};
-async function keepAwake(){try{if('wakeLock' in navigator&&run)wl=await navigator.wakeLock.request('screen')}catch(e){}}
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&run)keepAwake()});
-function stopLive(){run=false;cid++;if(tw){tw.terminate();tw=null}try{wl&&wl.release()}catch(e){}wl=null;try{ws.close()}catch(e){}clearInterval(tk);timers.forEach(clearTimeout);timers=[];active=null;const b=$('#go5');b.textContent='▶ SCAN';b.classList.remove('stop');setState('Arrêté','');idle()}
-async function startLive(){
- const a=AS[A];
- if(a.src==='fh'&&!$('#fk').value.trim()){$('#kb').open=true;setState('Colle ta clé Finnhub (gratuite) ci-dessous','wait');return}
- run=true;bars=[];cur={b:0,s:0,n:0};last=0;lastT=0;prevP=0;prevSide=0;fhErr='';t0=Date.now();sec=0;pxs=[];pend=[];off=0;candles=[];CS=NAMES.map(()=>({n:0,w:0}));
- const b=$('#go5');b.textContent='■ STOP';b.classList.add('stop');setState('Chargement des bougies 1 min…','wait');
- $('#sg').innerHTML='<div class="t" style="color:#f0b429;font-size:15px">⏳ Préparation…</div>';
- await seed();if(!run)return;
- setState('Connexion…','wait');connect(0);
- try{tw=new Worker(URL.createObjectURL(new Blob(['setInterval(()=>postMessage(1),1000)'],{type:'text/javascript'})));tw.onmessage=tick;tw.onerror=()=>{tw=null;tk=setInterval(tick,1000)}}catch(e){tk=setInterval(tick,1000)}
- keepAwake();
-}
-$('#go5').onclick=()=>run?stopLive():startLive();
-const today=()=>new Date().toISOString().slice(0,10);
-let G;try{G=JSON.parse(ls.g('gd1')||'')}catch(e){}
-if(!G||G.d!==today())G={d:today(),pnl:0,n:0,cl:0};
-$('#cap').value=ls.g('cap')||'';$('#lim').value=ls.g('lim')||'5';
-function gstate(){
- if(G.d!==today())G={d:today(),pnl:0,n:0,cl:0};
- const cap=+$('#cap').value||0,po=+$('#po').value||85,stake=Math.round(cap)>=0?Math.max(0,Math.round(cap*1)/100):0,lim=cap*(+$('#lim').value||5)/100;
- return{cap,po,stake,lim,lock:cap>0&&(G.cl>=3||-G.pnl>=lim)}}
-function guard(){
- const g=gstate();
- $('#gd').innerHTML=!g.cap?'<div style="grid-column:1/-1"><b>Entre ton capital</b>pour calculer ta mise (1 %)</div>':
- `<div><b>Mise conseillée (1 %)</b>${g.stake.toFixed(2)}</div><div><b>Résultat du jour</b><span class="${G.pnl>=0?'':'dn'}">${G.pnl>=0?'+':''}${G.pnl.toFixed(2)}</span> (${G.n} trades)</div><div><b>Pertes d'affilée</b>${G.cl}/3</div><div><b>Limite du jour</b>-${g.lim.toFixed(2)}</div>`+(g.lock?'<div class="verdict v-no" style="grid-column:1/-1">⛔ STOP pour aujourd\'hui. Ferme Pocket Option et reviens demain.</div>':'');
- ls.s('gd1',JSON.stringify(G));ls.s('cap',$('#cap').value);ls.s('lim',$('#lim').value);
-}
-$('#cap').onchange=$('#lim').onchange=guard;
-$('#bw').onclick=()=>{const g=gstate();G.pnl+=g.stake*g.po/100;G.cl=0;G.n++;guard()};
-$('#bl').onclick=()=>{const g=gstate();G.pnl-=g.stake;G.cl++;G.n++;guard()};
-chips();stats();guard();
-setTimeout(()=>{if(!run)startLive()},400);
+FORMAT CSV ATTENDU
+------------------
+Colonnes : time (ou timestamp/datetime/date), open, high, low, close, [volume].
+Horodatage en UTC par défaut ; sinon --csv-tz (ex. Etc/GMT-2 pour UTC+2). Barres = heure d'OUVERTURE.
 
-// ---------- FOREX 1 min ----------
-const PAIRS=['EUR/USD'];
-async function jget(u){const c=new AbortController(),t=setTimeout(()=>c.abort(),15000);try{const r=await fetch(u,{signal:c.signal});return await r.json()}finally{clearTimeout(t)}}
-const closed=()=>{const d=new Date(),w=d.getUTCDay(),h=d.getUTCHours();return w===6||(w===5&&h>=22)||(w===0&&h<22)};
-async function scan(){
- const key=$('#key').value.trim();if(!key)$('#kb').open=true;else ls.s('tdk',key);
- const b=$('#scan');b.disabled=true;msg('');
- const out=[];let err='',last='',done=0;const tot=PAIRS.length;
- const prog=()=>{b.textContent=`Analyse ${done}/${tot}…`;$('#list').innerHTML=`<div class="bar"><i style="width:${done/tot*100}%"></i></div>`+out.map(row).join('')};
- prog();
- await Promise.all((key?PAIRS:[]).map(async p=>{
-  try{const j=await jget(`https://api.twelvedata.com/time_series?symbol=${p}&interval=1min&outputsize=120&apikey=${key}`);
-   if(j.values&&j.values.length>=55){out.push({p,...score(j.values.slice().reverse().map(x=>+x.close))});last=j.values[0].datetime}
-   else err=j.code===429?'Limite atteinte : attends 1 minute.':(j.message||'Données indisponibles');
-  }catch(e){err='Connexion impossible (réseau, VPN ou bloqueur de pub ?)'}
-  done++;prog()}));
- out.sort((a,b)=>Math.abs(b.s)-Math.abs(a.s));
- $('#list').innerHTML=out.map(row).join('');
- const age=last?(Date.now()-new Date(last.replace(' ','T')+'Z'))/60000:0;
- msg((err?err+' ':'')+(!key?'Pour le forex, colle ta clé Twelve Data. ':'')+(key&&closed()?'⚠️ Forex fermé (week-end) : données de vendredi, ne trade pas dessus. ':(age>10?'⚠️ Données en retard de '+Math.round(age)+' min. ':''))+(out.length&&!err?'Scan de '+new Date().toLocaleTimeString('fr'):''));
- b.disabled=false;b.textContent='SCAN';
-}
-function row(r){
- const up=r.s>=3,dn=r.s<=-3,wk=Math.abs(r.s)===2,col=r.s>0?'#1fbf75':'#f04452';
- const ic=(up||dn||wk)?`<span style="color:${col};display:flex;${r.s<0?'transform:rotate(180deg)':''}">${ARROW}</span>`:'<span style="width:32px;text-align:center;color:#6b7785;font-size:22px">—</span>';
- const lab=up?'ACHETER<br>(HAUT)':dn?'VENDRE<br>(BAS)':wk?(r.s>0?'Haut faible':'Bas faible'):'Attendre';
- return `<div class="row ${up?'up':dn?'dn':''} ${wk?'weak':''}">${ic}<div class="n">${r.p}<small>${fmt(r.px)}</small></div><div class="l">${lab}</div></div>`}
-$('#scan').onclick=()=>scan().catch(e=>{msg('Erreur : '+e.message);$('#scan').disabled=false;$('#scan').textContent='SCAN'});
+MÉTHODE (résumé)
+----------------
+* Signal calculé uniquement sur bougies CLÔTURÉES. Heure du signal = heure de clôture de la bougie.
+* Prix d'entrée du backtest = OUVERTURE de la bougie suivante (+ glissement éventuel défavorable),
+  jamais le close de la bougie du signal. Règlement = close après N bougies. Égalité = remboursé.
+* Pas de chevauchement de transactions par défaut. Mise fixe : martingale interdite (config refusée).
+* Découpage chronologique 60/20/20 : développement / validation / test final. Le test final est
+  verrouillé par empreinte de configuration : toute modification des règles après lecture du test
+  final est refusée (supprime final_test.lock.json pour recommencer, en sachant que le test est « brûlé »).
+* Intervalle de confiance de Wilson 95 % ; verdict seulement si échantillon >= 300 transactions.
+* Comparaison à deux références : direction aléatoire aux mêmes instants, et suivi naïf EMA21/EMA50.
 
-// ---------- petite fenêtre flottante ----------
-let pw=null;const home=app.parentNode;
-$('#pin').onclick=async()=>{
- if(pw){pw.close();return}
- try{
-  pw='documentPictureInPicture' in window?await documentPictureInPicture.requestWindow({width:340,height:640}):window.open('','scanfx','width=340,height=640');
-  if(!pw)throw 0;
-  document.querySelectorAll('style').forEach(s=>pw.document.head.append(s.cloneNode(true)));
-  pw.document.title='Scan Pro';pw.document.body.append(app);document.getElementById('ph').style.display='block';
-  pw.addEventListener('pagehide',()=>{home.append(app);document.getElementById('ph').style.display='none';pw=null});
- }catch(e){pw=null;alert('Fenêtre flottante indisponible ici : sur téléphone, utilise l\'écran partagé.')}
-};
-</script>
-</body>
-</html>
+LIMITES CONNUES
+---------------
+* Avec des barres OHLC seulement, le prix réellement accessible après délai d'exécution est approximé
+  par l'ouverture de la bougie suivante. Les ticks ne sont pas disponibles.
+* Taux de paiement fixe (paramètre) : l'historique des paiements n'est pas disponible.
+* Tester plusieurs expirations sur les mêmes données augmente le risque de faux positif (comparaisons
+  multiples) : ne retiens pas l'expiration « qui marche le mieux » sans la confirmer sur le test final.
+* Les flags « fausse cassure » et « support/résistance » sont des heuristiques simples (pivots confirmés).
+* Rien ne garantit qu'un avantage passé persiste.
+
+DÉPANNAGE
+---------
+* « Historique insuffisant » : fournis au moins ~150 bougies (idéalement des milliers pour un backtest).
+* « Données périmées » : la dernière bougie clôturée est trop ancienne ; utilise --as-of pour un rejeu.
+* Heures décalées : règle --csv-tz ; le fuseau interne est toujours UTC.
+* Streamlit ne démarre pas : pip install streamlit plotly ; lance avec « streamlit run scanner.py ».
+* Test final refusé : la configuration a changé depuis le premier test final (voir verrou ci-dessus).
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+import os
+import sqlite3
+import sys
+import time
+import unittest
+import urllib.parse
+import urllib.request
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
+from typing import Callable, Optional
+
+import numpy as np
+import pandas as pd
+
+# ======================================================================================
+# CONSTANTES
+# ======================================================================================
+BUY, SELL, NO_TRADE = "BUY", "SELL", "NO TRADE"
+ST_CONFIRMED = "TENDANCE_CONFIRMEE"
+ST_POTENTIAL = "CONFIGURATION_POTENTIELLE"
+ST_INSUFF = "INSUFFISAMMENT_CONFIRMEE"
+WIN, LOSS, PUSH = "WIN", "LOSS", "PUSH"
+COLOR_BUY, COLOR_SELL, COLOR_NONE = "#16a34a", "#dc2626", "#6b7280"
+KILL_FILE = "STOP"
+LOCK_FILE = "final_test.lock.json"
+SCORE_NOTE = "Score de règles 0-100. Ce n'est PAS une probabilité de gain."
+
+
+# ======================================================================================
+# CONFIGURATION
+# ======================================================================================
+@dataclass
+class Config:
+    symbol: str = "EURUSD"
+    timeframe_min: int = 5
+    expiry_bars: tuple = (1, 2, 3)          # expirations testées, en nombre de bougies
+    live_expiry_bars: int = 1               # utilisé pour résoudre les signaux live (à choisir APRÈS validation)
+    payout: float = 0.85                    # taux de paiement (fraction), fixe
+    stake_mode: str = "fixed"               # seule valeur autorisée (martingale interdite)
+    initial_capital: float = 1000.0
+    stake_fraction: float = 0.01            # mise fixe = 1 % du capital INITIAL, jamais augmentée
+    slippage: float = 0.0                   # glissement défavorable sur le prix d'entrée (unité de prix)
+    # qualité des données
+    min_bars: int = 150
+    max_missing_ratio: float = 0.05
+    stale_after_bars: float = 2.0
+    # stratégie de référence (tendance + repli RSI)
+    adx_trend_min: float = 22.0
+    adx_range_max: float = 18.0
+    atr_spike_mult: float = 2.0
+    rsi_pullback_long: float = 50.0
+    rsi_pullback_short: float = 50.0
+    pivot_k: int = 3
+    sr_lookback: int = 100
+    sr_min_room_atr: float = 0.5
+    min_score: int = 60
+    use_macd_veto: bool = False             # MACD dérive des EMA : redondant, désactivé par défaut
+    # risque
+    max_consecutive_losses: int = 5
+    allow_overlap: bool = False
+    # backtest
+    split: tuple = (0.6, 0.2, 0.2)
+    min_trades_reliable: int = 300
+    csv_timezone: str = "UTC"
+    journal_path: str = "journal.db"
+
+    @property
+    def stake(self) -> float:
+        return self.initial_capital * self.stake_fraction
+
+    def validate(self) -> "Config":
+        if self.stake_mode != "fixed":
+            raise ValueError("Martingale / mise variable interdite : stake_mode doit être 'fixed'.")
+        if not (0 < self.payout < 1.5):
+            raise ValueError("payout doit être une fraction (ex. 0.85).")
+        if self.timeframe_min <= 0:
+            raise ValueError("timeframe_min doit être > 0.")
+        if abs(sum(self.split) - 1.0) > 1e-9 or len(self.split) != 3:
+            raise ValueError("split doit contenir 3 fractions de somme 1.")
+        if any(int(n) < 1 for n in self.expiry_bars):
+            raise ValueError("expiry_bars : entiers >= 1.")
+        return self
+
+    def config_hash(self) -> str:
+        d = asdict(self)
+        d.pop("journal_path", None)
+        d.pop("csv_timezone", None)
+        return hashlib.sha256(json.dumps(d, sort_keys=True, default=list).encode()).hexdigest()[:16]
+
+    @staticmethod
+    def from_env() -> "Config":
+        e = os.environ
+        c = Config()
+        if e.get("SCANNER_SYMBOL"):
+            c.symbol = e["SCANNER_SYMBOL"]
+        if e.get("SCANNER_TIMEFRAME_MIN"):
+            c.timeframe_min = int(e["SCANNER_TIMEFRAME_MIN"])
+        if e.get("SCANNER_PAYOUT"):
+            c.payout = float(e["SCANNER_PAYOUT"])
+        return c.validate()
+
+
+def load_dotenv_simple(path: str = ".env") -> None:
+    """Chargeur .env minimal (sans dépendance)."""
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+# ======================================================================================
+# MODULE 1 — DONNÉES (fournisseurs, validation, fraîcheur)
+# ======================================================================================
+class DataError(Exception):
+    pass
+
+
+OHLC = ["open", "high", "low", "close"]
+
+
+def _finalize_df(df: pd.DataFrame, source: str, symbol: str, tf: int) -> pd.DataFrame:
+    df = df.sort_index()
+    for c in OHLC + ["volume"]:
+        if c not in df.columns:
+            df[c] = np.nan
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    df = df[OHLC + ["volume"]]
+    df.attrs.update({"source": source, "symbol": symbol, "timeframe_min": tf, "timezone": "UTC"})
+    return df
+
+
+class CSVProvider:
+    TIME_COLS = ["time", "timestamp", "datetime", "date", "open_time", "opentime"]
+
+    def __init__(self, path: str):
+        self.path = path
+
+    def fetch(self, cfg: Config) -> pd.DataFrame:
+        if not os.path.exists(self.path):
+            raise DataError(f"Fichier introuvable : {self.path}")
+        raw = pd.read_csv(self.path)
+        raw.columns = [str(c).strip().lower() for c in raw.columns]
+        tcol = next((c for c in self.TIME_COLS if c in raw.columns), None)
+        if tcol is None:
+            raise DataError("Colonne temporelle absente (time/timestamp/datetime/date).")
+        miss = [c for c in OHLC if c not in raw.columns]
+        if miss:
+            raise DataError(f"Colonnes manquantes : {miss}")
+        t = raw[tcol]
+        if pd.api.types.is_numeric_dtype(t):
+            unit = "ms" if float(t.iloc[0]) > 1e11 else "s"
+            idx = pd.to_datetime(t, unit=unit, utc=True)
+        else:
+            idx = pd.to_datetime(t, errors="coerce")
+            if idx.isna().any():
+                raise DataError("Horodatages illisibles dans le CSV.")
+            if idx.dt.tz is None:
+                idx = idx.dt.tz_localize(cfg.csv_timezone).dt.tz_convert("UTC")
+            else:
+                idx = idx.dt.tz_convert("UTC")
+        raw.index = pd.DatetimeIndex(idx)
+        return _finalize_df(raw, f"CSV:{os.path.basename(self.path)}", cfg.symbol, cfg.timeframe_min)
+
+
+def _http_get_json(url: str, timeout: int = 15) -> dict:
+    req = urllib.request.Request(url, headers={"User-Agent": "scanner/1.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 (URL construite ici)
+        return json.loads(r.read().decode("utf-8"))
+
+
+class TwelveDataProvider:
+    """Twelve Data — fournisseur de données commercial avec API documentée (clé personnelle).
+    Marché FX réel. Non testé contre le service réel dans ce dépôt (voir avertissements)."""
+
+    BASE = "https://api.twelvedata.com/time_series"
+    INTERVALS = {1: "1min", 5: "5min", 15: "15min", 30: "30min", 60: "1h"}
+
+    def __init__(self, api_key: Optional[str] = None, outputsize: int = 1500):
+        self.api_key = api_key or os.environ.get("TWELVEDATA_API_KEY", "")
+        self.outputsize = outputsize
+
+    @staticmethod
+    def _symbol(sym: str) -> str:
+        s = sym.upper().replace("_OTC", "")
+        return f"{s[:3]}/{s[3:]}" if len(s) == 6 and "/" not in s else s
+
+    @staticmethod
+    def parse(payload: dict, cfg: Config) -> pd.DataFrame:
+        if payload.get("status") == "error" or "values" not in payload:
+            raise DataError(f"Réponse fournisseur invalide : {payload.get('message', payload)}")
+        df = pd.DataFrame(payload["values"])
+        idx = pd.to_datetime(df["datetime"], utc=True)  # demandé en UTC
+        df.index = pd.DatetimeIndex(idx)
+        return _finalize_df(df, "TwelveData", cfg.symbol, cfg.timeframe_min)
+
+    def fetch(self, cfg: Config) -> pd.DataFrame:
+        if not self.api_key:
+            raise DataError("TWELVEDATA_API_KEY absente (voir .env.example).")
+        if cfg.timeframe_min not in self.INTERVALS:
+            raise DataError(f"Unité de temps non gérée : {cfg.timeframe_min} min.")
+        q = urllib.parse.urlencode({
+            "symbol": self._symbol(cfg.symbol), "interval": self.INTERVALS[cfg.timeframe_min],
+            "outputsize": self.outputsize, "timezone": "UTC", "format": "JSON", "apikey": self.api_key})
+        try:
+            payload = _http_get_json(f"{self.BASE}?{q}")
+        except Exception as exc:  # réseau, HTTP, JSON
+            raise DataError(f"Connexion fournisseur impossible : {exc}") from exc
+        return self.parse(payload, cfg)
+
+
+def make_demo_data(n: int = 6000, tf_min: int = 5, seed: int = 7, start: str = "2024-01-01") -> pd.DataFrame:
+    """Marche aléatoire SYNTHÉTIQUE avec volatilité variable. Aucune valeur de performance."""
+    rng = np.random.default_rng(seed)
+    idx = pd.date_range(start, periods=int(n * 1.5), freq=f"{tf_min}min", tz="UTC")
+    idx = idx[idx.dayofweek < 5][:n]
+    vol = 0.0002 * np.exp(np.cumsum(rng.normal(0, 0.02, n)) * 0.3)
+    r = rng.normal(0, 1, n) * vol
+    close = 1.10 * np.exp(np.cumsum(r))
+    open_ = np.concatenate([[1.10], close[:-1]])
+    spread = np.abs(rng.normal(0, 1, n)) * vol * 0.6
+    high = np.maximum(open_, close) + spread
+    low = np.minimum(open_, close) - np.abs(rng.normal(0, 1, n)) * vol * 0.6
+    df = pd.DataFrame({"open": open_, "high": high, "low": low, "close": close,
+                       "volume": rng.integers(100, 1000, n)}, index=idx)
+    return _finalize_df(df, "SYNTHETIC_DEMO", "DEMO", tf_min)
+
+
+@dataclass
+class DataQuality:
+    ok: bool
+    issues: list
+    n_bars: int = 0
+    last_bar_open: Optional[str] = None
+    last_bar_close: Optional[str] = None
+    age_seconds: Optional[float] = None
+    missing_bars: int = 0
+    missing_ratio: float = 0.0
+    source: str = "?"
+    timezone: str = "UTC"
+    timeframe_min: int = 0
+
+
+def closed_only(df: pd.DataFrame, cfg: Config, now: Optional[pd.Timestamp] = None) -> pd.DataFrame:
+    """Retire toute bougie encore ouverte : jamais de confirmation sur une bougie non clôturée."""
+    now = now or pd.Timestamp.now(tz="UTC")
+    tf = pd.Timedelta(minutes=cfg.timeframe_min)
+    out = df[df.index + tf <= now]
+    out.attrs.update(df.attrs)
+    return out
+
+
+def validate(df: pd.DataFrame, cfg: Config, now: Optional[pd.Timestamp] = None, live: bool = True) -> DataQuality:
+    issues: list = []
+    tf = pd.Timedelta(minutes=cfg.timeframe_min)
+    src = df.attrs.get("source", "?")
+    if df is None or len(df) == 0:
+        return DataQuality(False, ["Aucune donnée."], source=src, timeframe_min=cfg.timeframe_min)
+    if not isinstance(df.index, pd.DatetimeIndex) or df.index.tz is None:
+        issues.append("Index non horodaté en UTC.")
+    if not df.index.is_monotonic_increasing:
+        issues.append("Horodatages non triés.")
+    if df.index.has_duplicates:
+        issues.append("Horodatages en double.")
+    if df[OHLC].isna().any().any():
+        issues.append("Valeurs OHLC manquantes (NaN).")
+    bad = ((df["high"] < df[["open", "close"]].max(axis=1)) | (df["low"] > df[["open", "close"]].min(axis=1))
+           | (df["high"] < df["low"]))
+    if bad.any():
+        issues.append(f"{int(bad.sum())} bougie(s) incohérente(s) (high/low).")
+    if (df[OHLC] <= 0).any().any():
+        issues.append("Prix <= 0 détectés.")
+    if len(df) < cfg.min_bars:
+        issues.append(f"Historique insuffisant : {len(df)} < {cfg.min_bars} bougies.")
+    missing, ratio = 0, 0.0
+    if len(df) > 2 and df.index.is_monotonic_increasing and not df.index.has_duplicates:
+        win = df.index[-500:]
+        diffs = pd.Series(win[1:] - win[:-1], index=win[1:])
+        if diffs.median() != tf:
+            issues.append(f"Unité de temps incohérente (pas médian {diffs.median()} au lieu de {tf}).")
+        prev_times = win[:-1]
+        for (cur, d), prv in zip(diffs.items(), prev_times):
+            if d > tf:
+                weekend = d <= pd.Timedelta(days=3) and prv.dayofweek in (4, 5) and cur.dayofweek in (6, 0)
+                if not weekend:
+                    missing += int(d / tf) - 1
+        ratio = missing / max(1, len(win))
+        if ratio > cfg.max_missing_ratio:
+            issues.append(f"Trop de bougies manquantes : {missing} ({ratio:.1%}).")
+    last_open = df.index[-1]
+    last_close = last_open + tf
+    age = None
+    if live:
+        now = now or pd.Timestamp.now(tz="UTC")
+        age = (now - last_close).total_seconds()
+        if age > cfg.stale_after_bars * tf.total_seconds():
+            issues.append(f"Données périmées : dernière bougie clôturée il y a {age/60:.1f} min.")
+        if age < 0:
+            issues.append("Dernière bougie encore ouverte ou horodatage dans le futur.")
+    return DataQuality(not issues, issues, len(df), last_open.isoformat(), last_close.isoformat(), age,
+                       missing, ratio, src, "UTC", cfg.timeframe_min)
+
+
+# ======================================================================================
+# MODULE 2 — INDICATEURS ET ANALYSE TECHNIQUE
+#   Rôles : EMA 9/21/50 = direction de tendance (une seule famille) ; ADX = FORCE de tendance
+#   (filtre de régime, pas de direction) ; RSI = timing du repli/reprise de momentum ;
+#   ATR = volatilité (filtre + distance aux niveaux) ; Bollinger = contexte d'étirement ;
+#   MACD = dérivé des EMA donc REDONDANT : calculé, mesuré (commande redundancy), veto optionnel.
+# ======================================================================================
+def ema(s: pd.Series, n: int) -> pd.Series:
+    return s.ewm(span=n, adjust=False, min_periods=n).mean()
+
+
+def wilder(s: pd.Series, n: int) -> pd.Series:
+    return s.ewm(alpha=1.0 / n, adjust=False, min_periods=n).mean()
+
+
+def rsi(close: pd.Series, n: int = 14) -> pd.Series:
+    d = close.diff()
+    au = wilder(d.clip(lower=0), n)
+    ad = wilder((-d.clip(upper=0)), n)
+    rs = au / ad
+    out = 100 - 100 / (1 + rs)
+    out = out.where(ad != 0, 100.0)
+    out = out.mask((au == 0) & (ad == 0), 50.0)
+    return out.where(au.notna())
+
+
+def macd(close: pd.Series, fast: int = 12, slow: int = 26, sig: int = 9):
+    line = ema(close, fast) - ema(close, slow)
+    signal = ema(line, sig)
+    return line, signal, line - signal
+
+
+def true_range(h: pd.Series, l: pd.Series, c: pd.Series) -> pd.Series:
+    pc = c.shift(1)
+    return pd.concat([h - l, (h - pc).abs(), (l - pc).abs()], axis=1).max(axis=1)
+
+
+def atr(h: pd.Series, l: pd.Series, c: pd.Series, n: int = 14) -> pd.Series:
+    return wilder(true_range(h, l, c), n)
+
+
+def adx(h: pd.Series, l: pd.Series, c: pd.Series, n: int = 14):
+    up, dn = h.diff(), -l.diff()
+    plus_dm = pd.Series(np.where((up > dn) & (up > 0), up, 0.0), index=h.index)
+    minus_dm = pd.Series(np.where((dn > up) & (dn > 0), dn, 0.0), index=h.index)
+    a = atr(h, l, c, n)
+    pdi = 100 * wilder(plus_dm, n) / a
+    mdi = 100 * wilder(minus_dm, n) / a
+    dx = 100 * (pdi - mdi).abs() / (pdi + mdi)
+    return wilder(dx, n), pdi, mdi
+
+
+def bollinger(c: pd.Series, n: int = 20, k: float = 2.0):
+    mid = c.rolling(n).mean()
+    sd = c.rolling(n).std(ddof=0)
+    up, lo = mid + k * sd, mid - k * sd
+    width = up - lo
+    pctb = ((c - lo) / width).where(width > 0)
+    return mid, up, lo, pctb, width / mid
+
+
+def compute_features(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
+    """Toutes les colonnes sont CAUSALES : la ligne t n'utilise que les bougies <= t (testé)."""
+    o, h, l, c = df["open"], df["high"], df["low"], df["close"]
+    f = df[OHLC + ["volume"]].copy()
+    for n in (9, 21, 50):
+        f[f"ema{n}"] = ema(c, n)
+    f["rsi"] = rsi(c, 14)
+    f["macd"], f["macd_signal"], f["macd_hist"] = macd(c)
+    f["atr"] = atr(h, l, c, 14)
+    f["adx"], f["plus_di"], f["minus_di"] = adx(h, l, c, 14)
+    f["bb_mid"], f["bb_up"], f["bb_lo"], f["bb_pctb"], f["bb_width"] = bollinger(c)
+    med = f["atr"].rolling(100, min_periods=50).median()
+    f["vol_ratio"] = f["atr"] / med
+    f["high_vol"] = (f["vol_ratio"] > cfg.atr_spike_mult).fillna(False)
+    f["atr_pct"] = f["atr"] / c
+    up = (f.ema21 > f.ema50) & (c > f.ema50) & (f.adx >= cfg.adx_trend_min)
+    dn = (f.ema21 < f.ema50) & (c < f.ema50) & (f.adx >= cfg.adx_trend_min)
+    f["trend_dir"] = np.where(up, 1, np.where(dn, -1, 0))
+    f["ranging"] = (f.adx <= cfg.adx_range_max).fillna(False)
+    # chandeliers
+    body = (c - o).abs()
+    rng = h - l
+    uw = h - pd.concat([o, c], axis=1).max(axis=1)
+    lw = pd.concat([o, c], axis=1).min(axis=1) - l
+    po, pc_ = o.shift(1), c.shift(1)
+    f["bull_engulf"] = ((pc_ < po) & (c > o) & (c >= po) & (o <= pc_)).fillna(False)
+    f["bear_engulf"] = ((pc_ > po) & (c < o) & (c <= po) & (o >= pc_)).fillna(False)
+    f["hammer"] = ((rng > 0) & (body > 0) & (lw >= 2 * body) & (uw <= body)).fillna(False)
+    f["shooting_star"] = ((rng > 0) & (body > 0) & (uw >= 2 * body) & (lw <= body)).fillna(False)
+    f["doji"] = ((rng > 0) & (body <= 0.1 * rng)).fillna(False)
+    # supports / résistances : pivots confirmés k bougies plus tard (aucune fuite du futur)
+    k = cfg.pivot_k
+    win = 2 * k + 1
+    ph = h.rolling(win, center=True).max() == h
+    pl = l.rolling(win, center=True).min() == l
+    f["res"] = h.where(ph).shift(k).ffill(limit=cfg.sr_lookback)
+    f["sup"] = l.where(pl).shift(k).ffill(limit=cfg.sr_lookback)
+    res_prev, sup_prev = f.res.shift(1), f.sup.shift(1)
+    brk_up = (c > res_prev) & (c.shift(1) <= res_prev)
+    brk_dn = (c < sup_prev) & (c.shift(1) >= sup_prev)
+    f["break_up"], f["break_dn"] = brk_up.fillna(False), brk_dn.fillna(False)
+    lvl_up = res_prev.where(brk_up).ffill(limit=3)
+    lvl_dn = sup_prev.where(brk_dn).ffill(limit=3)
+    f["fake_up"] = (lvl_up.shift(1).notna() & (c < lvl_up.shift(1))).fillna(False)
+    f["fake_dn"] = (lvl_dn.shift(1).notna() & (c > lvl_dn.shift(1))).fillna(False)
+    f["room_long_atr"] = np.where(f.res > c, (f.res - c) / f.atr, np.inf)
+    f["room_short_atr"] = np.where(f.sup < c, (c - f.sup) / f.atr, np.inf)
+    return f
+
+
+def redundancy_report(f: pd.DataFrame) -> pd.DataFrame:
+    comp = pd.DataFrame({
+        "EMA9-EMA21 (norm. ATR)": (f.ema9 - f.ema21) / f.atr,
+        "EMA21-EMA50 (norm. ATR)": (f.ema21 - f.ema50) / f.atr,
+        "MACD hist (norm. ATR)": f.macd_hist / f.atr,
+        "RSI-50": f.rsi - 50,
+        "Bollinger %B-0.5": f.bb_pctb - 0.5,
+        "ADX": f.adx,
+        "Volatilité (vol_ratio)": f.vol_ratio,
+    }).dropna()
+    return comp.corr()
+
+
+# ======================================================================================
+# MODULE 3 — MOTEUR DE SIGNAUX
+# ======================================================================================
+@dataclass
+class Decision:
+    direction: str
+    state: str
+    score: int
+    reasons: list = field(default_factory=list)
+    invalidations: list = field(default_factory=list)
+    vetoes: list = field(default_factory=list)
+
+
+def _nan(x) -> bool:
+    try:
+        return x is None or (isinstance(x, float) and math.isnan(x))
+    except Exception:
+        return True
+
+
+def _score(row: dict, d: int, cfg: Config):
+    s, why = 0, []
+    s += 25
+    why.append("EMA 21 > EMA 50 et clôture au-dessus de l'EMA 50 (+25)" if d > 0
+               else "EMA 21 < EMA 50 et clôture sous l'EMA 50 (+25)")
+    adx_v = row["adx"]
+    if adx_v >= cfg.adx_trend_min + 8:
+        s += 20
+        why.append(f"ADX {adx_v:.1f} : tendance forte (+20)")
+    else:
+        s += 10
+        why.append(f"ADX {adx_v:.1f} : tendance confirmée (+10)")
+    s += 20
+    why.append(f"RSI {row['rsi']:.1f} reprend le seuil de 50 et la clôture repasse du bon côté de l'EMA 9 (+20)")
+    bullish = d > 0
+    pat = (row["bull_engulf"] or row["hammer"]) if bullish else (row["bear_engulf"] or row["shooting_star"])
+    body_ok = (row["close"] > row["open"]) if bullish else (row["close"] < row["open"])
+    if pat:
+        s += 15
+        why.append("Chandelier de retournement favorable (engulfing/marteau/étoile filante) (+15)")
+    elif body_ok:
+        s += 5
+        why.append("Bougie de signal dans le sens du trade (+5)")
+    room = row["room_long_atr"] if bullish else row["room_short_atr"]
+    if room >= 1.0:
+        s += 10
+        why.append("Espace libre >= 1 ATR avant le prochain niveau (+10)")
+    else:
+        s += 5
+        why.append(f"Espace avant niveau {room:.2f} ATR (+5)")
+    pb = row["bb_pctb"]
+    if 0.2 <= pb <= 0.8:
+        s += 10
+        why.append(f"Prix non étiré dans les bandes de Bollinger (%B={pb:.2f}) (+10)")
+    return s, why
+
+
+def evaluate(row: dict, prev: Optional[dict], cfg: Config) -> Decision:
+    need = ["close", "ema9", "ema21", "ema50", "rsi", "adx", "atr", "bb_pctb", "vol_ratio"]
+    if prev is None or any(_nan(row.get(k)) for k in need) or _nan(prev.get("rsi")):
+        return Decision(NO_TRADE, ST_INSUFF, 0, vetoes=["Historique insuffisant (échauffement des indicateurs)"])
+    if row["high_vol"]:
+        return Decision(NO_TRADE, ST_INSUFF, 0,
+                        vetoes=[f"Volatilité anormalement élevée (ATR = {row['vol_ratio']:.1f} x médiane)"])
+    td = int(row["trend_dir"])
+    if td == 0:
+        msg = "Marché latéral (ADX bas)" if row["ranging"] else "Pas de tendance confirmée (EMA 21/50 ou ADX sous le seuil)"
+        return Decision(NO_TRADE, ST_INSUFF, 0, vetoes=[msg])
+    direction = BUY if td > 0 else SELL
+    if td > 0:
+        trigger = prev["rsi"] < cfg.rsi_pullback_long <= row["rsi"] and row["close"] > row["ema9"]
+    else:
+        trigger = prev["rsi"] > cfg.rsi_pullback_short >= row["rsi"] and row["close"] < row["ema9"]
+    base = [f"Tendance {'haussière' if td > 0 else 'baissière'} confirmée (EMA 21/50, ADX {row['adx']:.1f})"]
+    if not trigger:
+        return Decision(NO_TRADE, ST_POTENTIAL, 0, base,
+                        vetoes=["Déclencheur absent (RSI doit reprendre 50 dans le sens de la tendance, clôture du bon côté de l'EMA 9)"])
+    vetoes = []
+    room = row["room_long_atr"] if td > 0 else row["room_short_atr"]
+    if room < cfg.sr_min_room_atr:
+        vetoes.append(f"Niveau {'de résistance' if td > 0 else 'de support'} trop proche ({room:.2f} ATR)")
+    if td > 0 and row["fake_up"]:
+        vetoes.append("Fausse cassure haussière récente (rejet d'une résistance)")
+    if td < 0 and row["fake_dn"]:
+        vetoes.append("Fausse cassure baissière récente (rejet d'un support)")
+    if cfg.use_macd_veto and ((td > 0 and row["macd_hist"] < 0) or (td < 0 and row["macd_hist"] > 0)):
+        vetoes.append("MACD contredit la direction")
+    if vetoes:
+        return Decision(NO_TRADE, ST_POTENTIAL, 0, base, vetoes=vetoes)
+    score, why = _score(row, td, cfg)
+    if score < cfg.min_score:
+        return Decision(NO_TRADE, ST_INSUFF, score, base + why,
+                        vetoes=[f"Score {score} < seuil {cfg.min_score} : configuration insuffisamment confirmée"])
+    c = row["close"]
+    inv = [f"Clôture {'sous' if td > 0 else 'au-dessus de'} l'EMA 21 ({row['ema21']:.5f})",
+           "ADX repasse sous le seuil de tendance", "Volatilité anormale (ATR x2 la médiane)"]
+    lvl = row["sup"] if td > 0 else row["res"]
+    if not _nan(lvl):
+        inv.append(f"Cassure du {'support' if td > 0 else 'résistance'} {lvl:.5f}")
+    return Decision(direction, ST_CONFIRMED, score, base + why, inv)
+
+
+def all_decisions(f: pd.DataFrame, cfg: Config) -> list:
+    recs = f.to_dict("records")
+    return [evaluate(recs[i], recs[i - 1] if i > 0 else None, cfg) for i in range(len(recs))]
+
+
+def naive_decisions(f: pd.DataFrame) -> list:
+    """Référence naïve : suit l'état EMA21 vs EMA50 sur chaque bougie, sans aucun filtre."""
+    out = []
+    for a, b in zip(f["ema21"].values, f["ema50"].values):
+        if math.isnan(a) or math.isnan(b):
+            out.append(Decision(NO_TRADE, ST_INSUFF, 0))
+        else:
+            out.append(Decision(BUY if a > b else SELL, ST_CONFIRMED, 0))
+    return out
+
+
+@dataclass
+class Signal:
+    asset: str
+    time_utc: str
+    bar_open_utc: str
+    timeframe: str
+    direction: str
+    price: float
+    setup_state: str
+    score: int
+    score_note: str
+    reasons: list
+    invalidations: list
+    vetoes: list
+    data: dict
+
+    def to_text(self) -> str:
+        lines = [f"{self.asset} | {self.timeframe} | {self.direction} | {self.time_utc}",
+                 f"Prix observé (dernier close) : {self.price:.5f} | État : {self.setup_state} | Score : {self.score}/100",
+                 f"({self.score_note})"]
+        if self.reasons:
+            lines += ["Raisons :"] + [f"  - {r}" for r in self.reasons]
+        if self.vetoes:
+            lines += ["Blocages :"] + [f"  - {r}" for r in self.vetoes]
+        if self.invalidations:
+            lines += ["Invalidation si :"] + [f"  - {r}" for r in self.invalidations]
+        d = self.data
+        lines.append(f"Données : source={d.get('source')} | fraîcheur={d.get('age_seconds')} s | ok={d.get('ok')}")
+        return "\n".join(lines)
+
+
+# ======================================================================================
+# TRANSACTIONS : règlement partagé backtest / live
+# ======================================================================================
+def settle_trade(index, opens, closes, i: int, direction: str, N: int, cfg: Config, end: Optional[int] = None):
+    """Signal sur la bougie i (clôturée). Entrée = ouverture de i+1. Règlement = close de i+N."""
+    n = len(index) if end is None else end
+    e, s = i + 1, i + N
+    if s > n - 1:
+        return "unavailable", None
+    tf = pd.Timedelta(minutes=cfg.timeframe_min)
+    if index[e] - index[i] != tf or index[s] - index[e] != (N - 1) * tf:
+        return "gap", None
+    raw = float(opens[e])
+    entry = raw + cfg.slippage if direction == BUY else raw - cfg.slippage
+    settle = float(closes[s])
+    if direction == BUY:
+        res = WIN if settle > entry else LOSS if settle < entry else PUSH
+    else:
+        res = WIN if settle < entry else LOSS if settle > entry else PUSH
+    return "ok", dict(e=e, s=s, entry_raw=raw, entry=entry, settle=settle, result=res)
+
+
+def pnl_of(result: str, cfg: Config) -> float:
+    return cfg.stake * cfg.payout if result == WIN else -cfg.stake if result == LOSS else 0.0
+
+
+# ======================================================================================
+# MODULE 7 — BACKTESTING
+# ======================================================================================
+def split_indices(n: int, split: tuple):
+    a = int(n * split[0])
+    b = int(n * (split[0] + split[1]))
+    return {"dev": (0, a), "val": (a, b), "test": (b, n)}
+
+
+def simulate(df: pd.DataFrame, f: pd.DataFrame, decisions: list, cfg: Config, N: int, start: int, end: int):
+    """Toutes les transactions admissibles du segment [start, end). Aucune ne déborde du segment."""
+    idx, opens, closes = df.index, df["open"].values, df["close"].values
+    rows, excl_boundary, excl_gap, next_free = [], 0, 0, 0
+    for i in range(start, end):
+        d = decisions[i]
+        if d.direction == NO_TRADE:
+            continue
+        if not cfg.allow_overlap and i < next_free:
+            continue
+        status, t = settle_trade(idx, opens, closes, i, d.direction, N, cfg, end=end)
+        if status == "unavailable":
+            excl_boundary += 1
+            continue
+        if status == "gap":
+            excl_gap += 1
+            continue
+        next_free = t["s"]
+        rows.append(dict(
+            signal_time=(idx[i] + pd.Timedelta(minutes=cfg.timeframe_min)).isoformat(),
+            entry_time=idx[t["e"]].isoformat(),
+            settle_time=(idx[t["s"]] + pd.Timedelta(minutes=cfg.timeframe_min)).isoformat(),
+            direction=d.direction, expiry_bars=N, entry_raw=t["entry_raw"], entry=t["entry"],
+            settle=t["settle"], result=t["result"], pnl=pnl_of(t["result"], cfg), score=d.score,
+            atr_pct=float(f["atr_pct"].iloc[i]) if not math.isnan(f["atr_pct"].iloc[i]) else np.nan))
+    tr = pd.DataFrame(rows)
+    tr.attrs.update({"excluded_boundary": excl_boundary, "excluded_gap": excl_gap})
+    return tr
+
+
+def wilson(k: int, n: int, z: float = 1.96):
+    if n == 0:
+        return float("nan"), float("nan")
+    p = k / n
+    den = 1 + z * z / n
+    centre = (p + z * z / (2 * n)) / den
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / den
+    return centre - half, centre + half
+
+
+def longest_loss_streak(results) -> int:
+    best = cur = 0
+    for r in results:
+        if r == LOSS:
+            cur += 1
+            best = max(best, cur)
+        elif r == WIN:
+            cur = 0
+    return best
+
+
+def compute_metrics(tr: pd.DataFrame, cfg: Config) -> dict:
+    n = len(tr)
+    wins = int((tr["result"] == WIN).sum()) if n else 0
+    losses = int((tr["result"] == LOSS).sum()) if n else 0
+    pushes = n - wins - losses
+    decided = wins + losses
+    pnl = float(tr["pnl"].sum()) if n else 0.0
+    equity = cfg.initial_capital + (tr["pnl"].cumsum() if n else pd.Series([0.0]))
+    dd = float((equity.cummax() - equity).max()) if n else 0.0
+    lo, hi = wilson(wins, decided)
+    be = 1 / (1 + cfg.payout)
+    if decided < cfg.min_trades_reliable:
+        verdict = f"ÉCHANTILLON INSUFFISANT ({decided} < {cfg.min_trades_reliable}) : aucune conclusion possible."
+    elif lo > be:
+        verdict = "Avantage statistique détecté SUR CE SEGMENT (borne basse IC95 > seuil). À confirmer hors échantillon."
+    elif hi < be:
+        verdict = "Pas d'avantage : le taux de réussite est significativement sous le seuil de rentabilité."
+    else:
+        verdict = "Indéterminé : l'IC95 contient le seuil de rentabilité. Aucun avantage démontré."
+    return dict(
+        trades=n, wins=wins, losses=losses, pushes=pushes,
+        win_rate=(wins / decided if decided else float("nan")), ci95=(lo, hi), breakeven=be,
+        net_pnl=pnl, expectancy_per_trade=(pnl / n if n else float("nan")),
+        expectancy_in_stakes=(pnl / n / cfg.stake if n else float("nan")),
+        longest_loss_streak=longest_loss_streak(list(tr["result"])) if n else 0,
+        final_capital=float(equity.iloc[-1]), max_drawdown=dd, verdict=verdict,
+        excluded_boundary=tr.attrs.get("excluded_boundary", 0), excluded_gap=tr.attrs.get("excluded_gap", 0))
+
+
+def random_baseline(tr: pd.DataFrame, cfg: Config, sims: int = 300, seed: int = 123) -> dict:
+    """Mêmes instants d'entrée/règlement, direction tirée au hasard."""
+    if len(tr) == 0:
+        return dict(win_rate=float("nan"), expectancy_in_stakes=float("nan"))
+    rng = np.random.default_rng(seed)
+    move = np.sign(tr["settle"].values - tr["entry_raw"].values)
+    wr, ex = [], []
+    for _ in range(sims):
+        dirs = rng.choice([-1, 1], size=len(move))
+        w = int(((dirs * move) > 0).sum())
+        l_ = int(((dirs * move) < 0).sum())
+        wr.append(w / (w + l_) if (w + l_) else np.nan)
+        ex.append((w * cfg.payout - l_) / len(move))
+    return dict(win_rate=float(np.nanmean(wr)), expectancy_in_stakes=float(np.mean(ex)))
+
+
+def regime_breakdown(tr: pd.DataFrame, cfg: Config) -> dict:
+    out = {}
+    if len(tr) < 6:
+        return out
+    for d in (BUY, SELL):
+        sub = tr[tr["direction"] == d]
+        if len(sub):
+            out[f"direction={d}"] = compute_metrics(sub, cfg)
+    s = tr.dropna(subset=["atr_pct"])
+    if len(s) >= 30:
+        q = s["atr_pct"].quantile([1 / 3, 2 / 3]).values
+        for name, mask in (("volatilité basse", s.atr_pct <= q[0]),
+                           ("volatilité moyenne", (s.atr_pct > q[0]) & (s.atr_pct <= q[1])),
+                           ("volatilité haute", s.atr_pct > q[1])):
+            sub = s[mask]
+            if len(sub):
+                out[name] = compute_metrics(sub, cfg)
+    return out
+
+
+def run_stage(df, f, decisions, naive, cfg: Config, a: int, b: int) -> dict:
+    res = {}
+    for N in cfg.expiry_bars:
+        tr = simulate(df, f, decisions, cfg, int(N), a, b)
+        tr_n = simulate(df, f, naive, cfg, int(N), a, b)
+        res[int(N)] = dict(trades=tr, metrics=compute_metrics(tr, cfg),
+                           random=random_baseline(tr, cfg), naive=compute_metrics(tr_n, cfg),
+                           regimes=regime_breakdown(tr, cfg))
+    return res
+
+
+def _pct(x):
+    return "n/a" if x is None or (isinstance(x, float) and math.isnan(x)) else f"{x:.1%}"
+
+
+def format_stage(stage: str, span: str, res: dict, cfg: Config) -> str:
+    L = [f"\n=== SEGMENT {stage.upper()} ({span}) — {'SIMULATION' if True else ''} (argent fictif) ===",
+         f"Seuil de rentabilité (paiement {cfg.payout:.0%}) : {1/(1+cfg.payout):.1%} | mise fixe {cfg.stake:.2f}"]
+    for N, r in res.items():
+        m, rb, nv = r["metrics"], r["random"], r["naive"]
+        lo, hi = m["ci95"]
+        L += [f"\n-- Expiration {N} bougie(s) = {N*cfg.timeframe_min} min --",
+              f"Transactions {m['trades']} | gains {m['wins']} | pertes {m['losses']} | égalités {m['pushes']}"
+              f" | exclues (frontière/trous) {m['excluded_boundary']}/{m['excluded_gap']}",
+              f"Taux de réussite {_pct(m['win_rate'])} (IC95 {_pct(lo)} – {_pct(hi)})",
+              f"Gain/perte net {m['net_pnl']:+.2f} | espérance/transaction {m['expectancy_per_trade']:+.3f}"
+              f" ({m['expectancy_in_stakes']:+.3f} mise)" if m["trades"] else "Aucune transaction.",
+              f"Plus longue série de pertes {m['longest_loss_streak']} | capital final {m['final_capital']:.2f}"
+              f" | drawdown max {m['max_drawdown']:.2f}",
+              f"Référence aléatoire : réussite {_pct(rb['win_rate'])}, espérance {rb['expectancy_in_stakes']:+.3f} mise",
+              f"Référence naïve EMA : {nv['trades']} trans., réussite {_pct(nv['win_rate'])}, "
+              f"espérance {nv['expectancy_in_stakes']:+.3f} mise",
+              f"VERDICT : {m['verdict']}"]
+    return "\n".join(L)
+
+
+def check_final_lock(cfg: Config, lock_path: str = LOCK_FILE) -> None:
+    h = cfg.config_hash()
+    if os.path.exists(lock_path):
+        with open(lock_path, encoding="utf-8") as fh:
+            lock = json.load(fh)
+        if lock.get("config_hash") != h:
+            raise PermissionError(
+                "Test final REFUSÉ : la configuration a changé depuis la première lecture du test final "
+                f"({lock.get('created_utc')}). Modifier les règles après le test final invalide celui-ci.")
+    else:
+        with open(lock_path, "w", encoding="utf-8") as fh:
+            json.dump({"config_hash": h, "created_utc": datetime.now(timezone.utc).isoformat()}, fh)
+
+
+def run_backtest(df: pd.DataFrame, cfg: Config, stages: list, final: bool = False, out_dir: str = "reports",
+                 lock_path: str = LOCK_FILE) -> dict:
+    cfg.validate()
+    dq = validate(df, cfg, live=False)
+    if not dq.ok:
+        raise DataError("Données invalides pour le backtest : " + " | ".join(dq.issues))
+    if "test" in stages:
+        if not final:
+            raise PermissionError("Le test final exige --final (une seule lecture, règles figées).")
+        check_final_lock(cfg, lock_path)
+    f = compute_features(df, cfg)
+    decisions, naive = all_decisions(f, cfg), naive_decisions(f)
+    seg = split_indices(len(df), cfg.split)
+    os.makedirs(out_dir, exist_ok=True)
+    results, summary = {}, {}
+    for st in stages:
+        a, b = seg[st]
+        res = run_stage(df, f, decisions, naive, cfg, a, b)
+        results[st] = res
+        span = f"{df.index[a].date()} → {df.index[b-1].date()}, {b-a} bougies"
+        print(format_stage(st, span, res, cfg))
+        summary[st] = {str(N): {k: v for k, v in r["metrics"].items()} for N, r in res.items()}
+        for N, r in res.items():
+            r["trades"].to_csv(os.path.join(out_dir, f"trades_{st}_{N}.csv"), index=False)
+    with open(os.path.join(out_dir, "backtest_summary.json"), "w", encoding="utf-8") as fh:
+        json.dump({"config": asdict(cfg), "source": df.attrs.get("source"), "summary": summary}, fh,
+                  indent=2, default=str)
+    if len(cfg.expiry_bars) > 1:
+        print("\nNote : plusieurs expirations testées = comparaisons multiples ; ne retiens pas la meilleure "
+              "sans confirmation sur le test final.")
+    return results
+
+
+# ======================================================================================
+# JOURNAL (SQLite), RISQUE, ARRÊT D'URGENCE
+# ======================================================================================
+class Journal:
+    def __init__(self, path: str = "journal.db"):
+        self.con = sqlite3.connect(path, check_same_thread=False)
+        self.con.execute("""CREATE TABLE IF NOT EXISTS signals(
+            key TEXT PRIMARY KEY, created_utc TEXT, symbol TEXT, tf INTEGER, bar_open_utc TEXT,
+            signal_time_utc TEXT, direction TEXT, price REAL, score INTEGER, setup_state TEXT,
+            reasons TEXT, invalidations TEXT, source TEXT, data_age_s REAL, expiry_bars INTEGER,
+            outcome TEXT, outcome_pnl REAL, alerted INTEGER DEFAULT 0, origin TEXT DEFAULT 'live')""")
+        self.con.execute("CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT)")
+        self.con.commit()
+
+    def add_signal(self, s: Signal, tf: int, expiry_bars: int) -> bool:
+        key = f"{s.asset}|{tf}|{s.bar_open_utc}"
+        cur = self.con.execute(
+            "INSERT OR IGNORE INTO signals(key,created_utc,symbol,tf,bar_open_utc,signal_time_utc,direction,price,"
+            "score,setup_state,reasons,invalidations,source,data_age_s,expiry_bars) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (key, datetime.now(timezone.utc).isoformat(), s.asset, tf, s.bar_open_utc, s.time_utc, s.direction,
+             s.price, s.score, s.setup_state, json.dumps(s.reasons, ensure_ascii=False),
+             json.dumps(s.invalidations, ensure_ascii=False), s.data.get("source"), s.data.get("age_seconds"),
+             expiry_bars))
+        self.con.commit()
+        return cur.rowcount == 1
+
+    def claim_alert(self, key: str) -> bool:
+        cur = self.con.execute("UPDATE signals SET alerted=1 WHERE key=? AND alerted=0", (key,))
+        self.con.commit()
+        return cur.rowcount == 1
+
+    def get_kv(self, k: str, default=None):
+        r = self.con.execute("SELECT v FROM kv WHERE k=?", (k,)).fetchone()
+        return r[0] if r else default
+
+    def set_kv(self, k: str, v: str) -> None:
+        self.con.execute("INSERT INTO kv(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v", (k, v))
+        self.con.commit()
+
+    def pending(self, symbol: str, tf: int) -> list:
+        return self.con.execute(
+            "SELECT key, bar_open_utc, direction, expiry_bars FROM signals WHERE symbol=? AND tf=? AND outcome IS NULL",
+            (symbol, tf)).fetchall()
+
+    def set_outcome(self, key: str, outcome: str, pnl: float) -> None:
+        self.con.execute("UPDATE signals SET outcome=?, outcome_pnl=? WHERE key=?", (outcome, pnl, key))
+        self.con.commit()
+
+    def recent_outcomes(self, symbol: str, tf: int, k: int) -> list:
+        rows = self.con.execute(
+            "SELECT outcome FROM signals WHERE symbol=? AND tf=? AND outcome IN ('WIN','LOSS','PUSH') "
+            "ORDER BY signal_time_utc DESC LIMIT ?", (symbol, tf, k)).fetchall()
+        return [r[0] for r in rows]
+
+    def signals_df(self, symbol: str, tf: int) -> pd.DataFrame:
+        return pd.read_sql_query("SELECT * FROM signals WHERE symbol=? AND tf=? ORDER BY signal_time_utc",
+                                 self.con, params=(symbol, tf))
+
+
+def resolve_outcomes(journal: Journal, df: pd.DataFrame, cfg: Config) -> int:
+    n_done = 0
+    for key, bar_open, direction, N in journal.pending(cfg.symbol, cfg.timeframe_min):
+        t = pd.Timestamp(bar_open)
+        if t not in df.index:
+            continue
+        i = df.index.get_loc(t)
+        status, r = settle_trade(df.index, df["open"].values, df["close"].values, i, direction, int(N), cfg)
+        if status == "ok":
+            journal.set_outcome(key, r["result"], pnl_of(r["result"], cfg))
+            n_done += 1
+        elif status == "gap":
+            journal.set_outcome(key, "EXCLU_TROU_DE_DONNEES", 0.0)
+    return n_done
+
+
+def consecutive_losses(outcomes: list) -> int:
+    n = 0
+    for o in outcomes:  # du plus récent au plus ancien
+        if o == LOSS:
+            n += 1
+        elif o == WIN:
+            break
+    return n
+
+
+def is_killed(path: str = KILL_FILE) -> bool:
+    return os.path.exists(path)
+
+
+def set_kill(on: bool, path: str = KILL_FILE) -> None:
+    if on:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(datetime.now(timezone.utc).isoformat())
+    elif os.path.exists(path):
+        os.remove(path)
+
+
+# ======================================================================================
+# MODULE 6 — ALERTES TELEGRAM (facultatif, aucune exécution de transaction)
+# ======================================================================================
+class Telegram:
+    def __init__(self, token: Optional[str] = None, chat_id: Optional[str] = None,
+                 sender: Optional[Callable[[str, str, str], bool]] = None):
+        self.token = token or os.environ.get("TELEGRAM_BOT_TOKEN", "")
+        self.chat_id = chat_id or os.environ.get("TELEGRAM_CHAT_ID", "")
+        self._sender = sender or self._http_send
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.token and self.chat_id)
+
+    @staticmethod
+    def _http_send(token: str, chat_id: str, text: str) -> bool:
+        data = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
+        req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=data)
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:  # noqa: S310
+                return r.status == 200
+        except Exception:
+            return False
+
+    def send(self, text: str) -> bool:
+        return bool(self.enabled and self._sender(self.token, self.chat_id, text))
+
+
+LIMITS_TEXT = ("Limites : le prix d'entrée réel peut différer du prix observé ; le score n'est pas une probabilité ; "
+               "aucun avantage statistique n'est garanti ; données possiblement retardées.")
+
+
+def format_alert(s: Signal) -> str:
+    return (f"{s.direction} — {s.asset} — {s.timeframe}\nHeure (UTC) : {s.time_utc}\n"
+            f"Prix observé : {s.price:.5f}\nScore de règles : {s.score}/100 (≠ probabilité)\n"
+            "Raisons :\n" + "\n".join(f"- {r}" for r in s.reasons) + f"\n{LIMITS_TEXT}")
+
+
+# ======================================================================================
+# SCAN (temps réel ou rejeu)
+# ======================================================================================
+def _no_signal(cfg: Config, now: pd.Timestamp, vetoes: list, dq: Optional[DataQuality] = None,
+               price: float = float("nan"), connection_ok: bool = True) -> Signal:
+    data = asdict(dq) if dq else {"ok": False, "source": "?", "age_seconds": None}
+    data["connection_ok"] = connection_ok
+    return Signal(cfg.symbol, now.isoformat(), now.isoformat(), f"{cfg.timeframe_min}m", NO_TRADE, price,
+                  ST_INSUFF, 0, SCORE_NOTE, [], [], vetoes, data)
+
+
+def scan_once(cfg: Config, provider, journal: Journal, now: Optional[pd.Timestamp] = None,
+              notifier: Optional[Telegram] = None, kill_path: str = KILL_FILE) -> Signal:
+    cfg.validate()
+    now = now or pd.Timestamp.now(tz="UTC")
+    notifier = notifier or Telegram()
+
+    def warn_once(state: str, msg: str):
+        if journal.get_kv("data_state") != state:
+            journal.set_kv("data_state", state)
+            if state != "ok":
+                notifier.send(f"AVERTISSEMENT {cfg.symbol} {cfg.timeframe_min}m : {msg}\nSignaux suspendus.")
+
+    if is_killed(kill_path):
+        return _no_signal(cfg, now, ["ARRÊT D'URGENCE actif (fichier STOP présent) : aucun signal produit"])
+    try:
+        df = provider.fetch(cfg)
+    except DataError as exc:
+        warn_once("connexion", str(exc))
+        return _no_signal(cfg, now, [f"Connexion/données indisponibles : {exc}"], connection_ok=False)
+    df = closed_only(df, cfg, now)
+    dq = validate(df, cfg, now, live=True)
+    if not dq.ok:
+        warn_once("donnees", " ; ".join(dq.issues))
+        price = float(df["close"].iloc[-1]) if len(df) else float("nan")
+        return _no_signal(cfg, now, dq.issues, dq, price)
+    warn_once("ok", "")
+    f = compute_features(df, cfg)
+    resolve_outcomes(journal, df, cfg)
+    last, prev = f.iloc[-1].to_dict(), f.iloc[-2].to_dict()
+    dec = evaluate(last, prev, cfg)
+    streak = consecutive_losses(journal.recent_outcomes(cfg.symbol, cfg.timeframe_min, cfg.max_consecutive_losses))
+    if dec.direction != NO_TRADE and streak >= cfg.max_consecutive_losses:
+        dec = Decision(NO_TRADE, ST_POTENTIAL, dec.score, dec.reasons,
+                       vetoes=[f"{streak} pertes consécutives dans le journal : signaux suspendus (revoir la stratégie)"])
+    bar_open = df.index[-1]
+    sig = Signal(cfg.symbol, (bar_open + pd.Timedelta(minutes=cfg.timeframe_min)).isoformat(), bar_open.isoformat(),
+                 f"{cfg.timeframe_min}m", dec.direction, float(last["close"]), dec.state, dec.score, SCORE_NOTE,
+                 dec.reasons, dec.invalidations, dec.vetoes,
+                 dict(asdict(dq), connection_ok=True))
+    if dec.direction != NO_TRADE:
+        inserted = journal.add_signal(sig, cfg.timeframe_min, cfg.live_expiry_bars)
+        key = f"{sig.asset}|{cfg.timeframe_min}|{sig.bar_open_utc}"
+        if inserted and journal.claim_alert(key):
+            notifier.send(format_alert(sig))
+    journal.set_kv("last_scan", json.dumps({"time": now.isoformat(), "direction": dec.direction}))
+    return sig
+
+
+# ======================================================================================
+# MODULE 5 — TABLEAU DE BORD (streamlit run scanner.py)
+# ======================================================================================
+def dashboard_main() -> None:
+    import streamlit as st
+    import plotly.graph_objects as go
+
+    load_dotenv_simple()
+    st.set_page_config(page_title="Scanner de marché", layout="wide")
+    st.title("Scanner de marché — analyse, pas prédiction")
+    st.caption("Aucune exécution de transaction. Les résultats de backtest sont des SIMULATIONS (argent fictif). "
+               "Le score n'est pas une probabilité de gain.")
+    with st.sidebar:
+        st.header("Configuration")
+        src = st.radio("Source de données", ["CSV", "Twelve Data (API)"])
+        symbol = st.text_input("Actif", "EURUSD")
+        tf = st.selectbox("Unité de temps (min)", [1, 5, 15, 30, 60], index=1)
+        payout = st.slider("Taux de paiement", 0.50, 0.95, 0.85, 0.01)
+        path = st.text_input("Chemin CSV", "demo.csv") if src == "CSV" else None
+        tz = st.text_input("Fuseau du CSV", "UTC") if src == "CSV" else "UTC"
+        as_of_txt = st.text_input("Rejeu à la date UTC (vide = maintenant)", "")
+        n_show = st.slider("Bougies affichées", 100, 1000, 300, 50)
+        show_ind = st.multiselect("Indicateurs", ["EMA 9", "EMA 21", "EMA 50", "Bollinger"], ["EMA 21", "EMA 50"])
+        st.divider()
+        killed = is_killed()
+        if killed:
+            st.error("ARRÊT D'URGENCE ACTIF")
+            if st.button("Reprendre"):
+                set_kill(False)
+                st.rerun()
+        elif st.button("ARRÊT D'URGENCE", type="primary"):
+            set_kill(True)
+            st.rerun()
+    cfg = Config(symbol=symbol, timeframe_min=int(tf), payout=float(payout), csv_timezone=tz).validate()
+    provider = CSVProvider(path) if src == "CSV" else TwelveDataProvider()
+    now = pd.Timestamp(as_of_txt, tz="UTC") if as_of_txt.strip() else pd.Timestamp.now(tz="UTC")
+    journal = Journal(cfg.journal_path)
+    conn_ok, err, df = True, "", None
+    try:
+        df = closed_only(provider.fetch(cfg), cfg, now)
+    except DataError as exc:
+        conn_ok, err = False, str(exc)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Connexion données", "OK" if conn_ok else "ERREUR")
+    if not conn_ok:
+        c1.error(err)
+        st.stop()
+    dq = validate(df, cfg, now, live=True)
+    c2.metric("Fraîcheur", f"{dq.age_seconds/60:.1f} min" if dq.age_seconds is not None else "n/a")
+    c3.metric("Dernière bougie clôturée (UTC)", (dq.last_bar_close or "n/a")[:19])
+    live_sigs = journal.signals_df(cfg.symbol, cfg.timeframe_min)
+    c4.metric("Dernier signal live", live_sigs["signal_time_utc"].iloc[-1][:19] if len(live_sigs) else "aucun")
+    if not dq.ok:
+        st.warning("Qualité des données insuffisante — signaux suspendus : " + " | ".join(dq.issues))
+    if st.button("Scanner maintenant"):
+        sg = scan_once(cfg, provider, journal, now)
+        col = COLOR_BUY if sg.direction == BUY else COLOR_SELL if sg.direction == SELL else COLOR_NONE
+        st.markdown(f"<div style='border-left:8px solid {col};padding:8px 12px'><b style='color:{col}'>"
+                    f"{sg.direction}</b> — {sg.asset} {sg.timeframe}</div>", unsafe_allow_html=True)
+        st.code(sg.to_text())
+    f = compute_features(df, cfg)
+    decisions = all_decisions(f, cfg)
+    tab1, tab2, tab3, tab4 = st.tabs(["Graphique", "Backtest (dev / validation)", "Journal live", "Risque"])
+    with tab1:
+        view = f.iloc[-n_show:]
+        off = len(f) - len(view)
+        fig = go.Figure(go.Candlestick(x=view.index, open=view.open, high=view.high, low=view.low, close=view.close,
+                                       increasing_line_color="#e2e8f0", decreasing_line_color="#475569",
+                                       name="Prix"))
+        for nm, col in (("EMA 9", "ema9"), ("EMA 21", "ema21"), ("EMA 50", "ema50")):
+            if nm in show_ind:
+                fig.add_trace(go.Scatter(x=view.index, y=view[col], name=nm, line=dict(width=1)))
+        if "Bollinger" in show_ind:
+            for col in ("bb_up", "bb_lo"):
+                fig.add_trace(go.Scatter(x=view.index, y=view[col], name=col, line=dict(width=1, dash="dot")))
+        rb = [(view.index[i], view.high.iloc[i]) for i in range(len(view)) if decisions[off + i].direction == BUY]
+        rs = [(view.index[i], view.low.iloc[i]) for i in range(len(view)) if decisions[off + i].direction == SELL]
+        rn = [(view.index[i], view.low.iloc[i]) for i in range(len(view)) if decisions[off + i].direction == NO_TRADE]
+        fig.add_trace(go.Scatter(x=[a for a, _ in rn], y=[b * 0.9999 for _, b in rn], mode="markers", name="NO TRADE",
+                                 marker=dict(color=COLOR_NONE, size=3)))
+        fig.add_trace(go.Scatter(x=[a for a, _ in rb], y=[b for _, b in rb], mode="markers",
+                                 name="BUY rejoué (historique)",
+                                 marker=dict(symbol="triangle-up-open", color=COLOR_BUY, size=11, line=dict(width=2))))
+        fig.add_trace(go.Scatter(x=[a for a, _ in rs], y=[b for _, b in rs], mode="markers",
+                                 name="SELL rejoué (historique)",
+                                 marker=dict(symbol="triangle-down-open", color=COLOR_SELL, size=11, line=dict(width=2))))
+        if len(live_sigs):
+            for d, sym, col in ((BUY, "triangle-up", COLOR_BUY), (SELL, "triangle-down", COLOR_SELL)):
+                sub = live_sigs[live_sigs.direction == d]
+                if len(sub):
+                    fig.add_trace(go.Scatter(x=pd.to_datetime(sub.bar_open_utc), y=sub.price, mode="markers",
+                                             name=f"{d} LIVE (journal)",
+                                             marker=dict(symbol=sym, color=col, size=14)))
+        fig.update_layout(height=650, xaxis_rangeslider_visible=False, margin=dict(l=10, r=10, t=30, b=10))
+        st.plotly_chart(fig, width="stretch")
+        st.caption("Triangles creux = signaux REJOUÉS sur l'historique avec des données causales (non une preuve de "
+                   "performance). Triangles pleins = signaux réellement émis en direct et enregistrés au journal. "
+                   "Points gris = NO TRADE. Les bougies sont volontairement neutres (vert/rouge réservés aux signaux).")
+    with tab2:
+        seg = split_indices(len(df), cfg.split)
+        if len(df) < 1000:
+            st.info("Moins de 1000 bougies : le backtest sera probablement non concluant.")
+        stage = st.selectbox("Segment", ["dev", "val"])
+        naive = naive_decisions(f)
+        a, b = seg[stage]
+        res = run_stage(df, f, decisions, naive, cfg, a, b)
+        for N, r in res.items():
+            m = r["metrics"]
+            st.subheader(f"Expiration {N} bougie(s) — {N*cfg.timeframe_min} min")
+            st.write(f"Transactions {m['trades']} | gains {m['wins']} | pertes {m['losses']} | "
+                     f"réussite {_pct(m['win_rate'])} (IC95 {_pct(m['ci95'][0])} – {_pct(m['ci95'][1])}) | "
+                     f"seuil de rentabilité {m['breakeven']:.1%} | espérance/trans. {m['expectancy_in_stakes']:+.3f} mise | "
+                     f"série de pertes max {m['longest_loss_streak']} | drawdown max {m['max_drawdown']:.2f}")
+            st.info(m["verdict"])
+            if len(r["trades"]):
+                eq = cfg.initial_capital + r["trades"]["pnl"].cumsum()
+                st.line_chart(eq.reset_index(drop=True))
+        st.caption("Le test final n'est disponible qu'en ligne de commande (--final) afin d'être lu une seule fois.")
+    with tab3:
+        st.dataframe(live_sigs if len(live_sigs) else pd.DataFrame({"info": ["Aucun signal live enregistré."]}))
+    with tab4:
+        outs = journal.recent_outcomes(cfg.symbol, cfg.timeframe_min, 50)
+        st.write(f"Pertes consécutives (journal live) : {consecutive_losses(outs)} / limite {cfg.max_consecutive_losses}")
+        st.write("Martingale et augmentation de mise après perte : interdites (mise fixe).")
+        last = f.iloc[-1]
+        flags = []
+        if last["high_vol"]:
+            flags.append("Volatilité anormalement élevée")
+        if last["ranging"]:
+            flags.append("Marché latéral")
+        st.write("Conditions défavorables actuelles : " + (", ".join(flags) if flags else "aucune détectée"))
+
+
+# ======================================================================================
+# TESTS AUTOMATISÉS (python scanner.py test)
+# ======================================================================================
+class TestScanner(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.mkdtemp()
+        self.cfg = Config(min_bars=50)
+
+    def p(self, name):
+        return os.path.join(self.tmp, name)
+
+    # ---- indicateurs
+    def test_indicators_basic(self):
+        const = pd.Series([1.0] * 100)
+        self.assertTrue(np.allclose(ema(const, 21).dropna(), 1.0))
+        self.assertAlmostEqual(rsi(const).iloc[-1], 50.0)
+        rising = pd.Series(np.arange(1, 101, dtype=float))
+        self.assertAlmostEqual(rsi(rising).iloc[-1], 100.0)
+        h = pd.Series(np.arange(100, dtype=float) + 1.0)
+        l = h - 1.0
+        c = h - 0.5
+        self.assertAlmostEqual(atr(h, l, c).iloc[-1], 1.5, delta=0.01)  # TR = 1.5 ; lissage de Wilson converge vers 1.5
+        self.assertGreater(adx(h, l, c)[0].iloc[-1], 90)
+        _, _, _, pb, w = bollinger(const)
+        self.assertAlmostEqual(w.iloc[-1], 0.0)
+        self.assertTrue(pd.isna(pb.iloc[-1]))
+        line, sig, hist = macd(rising)
+        self.assertGreater(line.iloc[-1], 0)
+
+    def test_wilson(self):
+        lo, hi = wilson(50, 100)
+        self.assertAlmostEqual(lo, 0.4038, places=3)
+        self.assertAlmostEqual(hi, 0.5962, places=3)
+        self.assertTrue(math.isnan(wilson(0, 0)[0]))
+
+    def test_no_lookahead_features(self):
+        df = make_demo_data(1500)
+        full = compute_features(df, self.cfg)
+        part = compute_features(df.iloc[:1000], self.cfg)
+        pd.testing.assert_frame_equal(full.iloc[:1000].reset_index(drop=True), part.reset_index(drop=True),
+                                      check_exact=False, rtol=1e-9, atol=1e-12)
+
+    def test_decisions_do_not_depend_on_future(self):
+        df = make_demo_data(1500)
+        d_full = all_decisions(compute_features(df, self.cfg), self.cfg)
+        d_part = all_decisions(compute_features(df.iloc[:900], self.cfg), self.cfg)
+        self.assertEqual([x.direction for x in d_full[:900]], [x.direction for x in d_part])
+
+    # ---- données
+    def test_validation_detects_problems(self):
+        df = make_demo_data(400)
+        now = df.index[-1] + pd.Timedelta(minutes=5, seconds=3)
+        self.assertTrue(validate(df, self.cfg, now).ok)
+        stale = validate(df, self.cfg, now + pd.Timedelta(hours=3))
+        self.assertFalse(stale.ok)
+        self.assertTrue(any("périmées" in s for s in stale.issues))
+        dup = pd.concat([df, df.iloc[-1:]])
+        self.assertTrue(any("double" in s for s in validate(dup, self.cfg, now).issues))
+        nan = df.copy()
+        nan.iloc[10, 0] = np.nan
+        self.assertTrue(any("NaN" in s for s in validate(nan, self.cfg, now).issues))
+        bad = df.copy()
+        bad.iloc[20, bad.columns.get_loc("high")] = bad.iloc[20]["low"] - 0.01
+        self.assertTrue(any("incohérente" in s for s in validate(bad, self.cfg, now).issues))
+        short = validate(df.iloc[:20], self.cfg, now)
+        self.assertFalse(short.ok)
+        holes = df.drop(df.index[300:340])
+        self.assertTrue(any("manquantes" in s for s in validate(holes, self.cfg, now).issues))
+
+    def test_closed_only_drops_open_bar(self):
+        df = make_demo_data(100)
+        now = df.index[-1] + pd.Timedelta(minutes=2)  # dernière bougie encore ouverte
+        out = closed_only(df, self.cfg, now)
+        self.assertEqual(len(out), len(df) - 1)
+
+    def test_csv_roundtrip_and_timezone(self):
+        df = make_demo_data(120)
+        raw = df.copy()
+        raw.index = raw.index.tz_convert("Etc/GMT-2").tz_localize(None)  # UTC+2 naïf
+        raw.index.name = "time"
+        raw.reset_index().to_csv(self.p("x.csv"), index=False)
+        cfg = Config(csv_timezone="Etc/GMT-2")
+        out = CSVProvider(self.p("x.csv")).fetch(cfg)
+        self.assertTrue((out.index == df.index).all())
+        with self.assertRaises(DataError):
+            CSVProvider(self.p("absent.csv")).fetch(cfg)
+
+    def test_twelvedata_parse(self):
+        payload = {"status": "ok", "values": [
+            {"datetime": "2024-01-02 00:10:00", "open": "1.1", "high": "1.2", "low": "1.0", "close": "1.15", "volume": "0"},
+            {"datetime": "2024-01-02 00:05:00", "open": "1.0", "high": "1.2", "low": "0.9", "close": "1.1"}]}
+        df = TwelveDataProvider.parse(payload, self.cfg)
+        self.assertTrue(df.index.is_monotonic_increasing)
+        self.assertEqual(str(df.index.tz), "UTC")
+        with self.assertRaises(DataError):
+            TwelveDataProvider.parse({"status": "error", "message": "bad key"}, self.cfg)
+        with self.assertRaises(DataError):
+            TwelveDataProvider(api_key="").fetch(self.cfg)
+
+    # ---- règlement / backtest
+    def _flat_df(self, n=30):
+        idx = pd.date_range("2024-01-01", periods=n, freq="5min", tz="UTC")
+        base = np.linspace(1.0, 1.0 + 0.001 * n, n)
+        return pd.DataFrame({"open": base, "high": base + 0.0005, "low": base - 0.0005, "close": base + 0.0002,
+                             "volume": 1.0}, index=idx)
+
+    def test_settlement_arithmetic(self):
+        df = self._flat_df()
+        df.iloc[8, df.columns.get_loc("close")] = df.iloc[6]["open"] + 0.01   # hausse nette
+        cfg = Config(payout=0.8, initial_capital=1000, stake_fraction=0.01)
+        st, r = settle_trade(df.index, df["open"].values, df["close"].values, 5, BUY, 3, cfg)
+        self.assertEqual(st, "ok")
+        self.assertEqual(r["e"], 6)
+        self.assertEqual(r["s"], 8)
+        self.assertEqual(r["entry_raw"], df.iloc[6]["open"])  # ouverture de la bougie SUIVANTE
+        self.assertEqual(r["result"], WIN)
+        self.assertAlmostEqual(pnl_of(WIN, cfg), 8.0)
+        st, r = settle_trade(df.index, df["open"].values, df["close"].values, 5, SELL, 3, cfg)
+        self.assertEqual(r["result"], LOSS)
+        self.assertAlmostEqual(pnl_of(LOSS, cfg), -10.0)
+        df.iloc[8, df.columns.get_loc("close")] = df.iloc[6]["open"]
+        st, r = settle_trade(df.index, df["open"].values, df["close"].values, 5, BUY, 3, cfg)
+        self.assertEqual(r["result"], PUSH)
+        self.assertEqual(pnl_of(PUSH, cfg), 0.0)
+        self.assertEqual(settle_trade(df.index, df["open"].values, df["close"].values, 29, BUY, 1, cfg)[0], "unavailable")
+        gap = df.drop(df.index[7])
+        self.assertEqual(settle_trade(gap.index, gap["open"].values, gap["close"].values, 5, BUY, 3, cfg)[0], "gap")
+
+    def test_slippage_is_adverse(self):
+        df = self._flat_df()
+        cfg = Config(slippage=0.001)
+        _, rb = settle_trade(df.index, df["open"].values, df["close"].values, 5, BUY, 1, cfg)
+        _, rs = settle_trade(df.index, df["open"].values, df["close"].values, 5, SELL, 1, cfg)
+        self.assertGreater(rb["entry"], rb["entry_raw"])
+        self.assertLess(rs["entry"], rs["entry_raw"])
+
+    def test_simulate_no_overlap_and_segment_bounds(self):
+        df = self._flat_df(40)
+        cfg = Config(min_bars=10)
+        f = compute_features(df, cfg)
+        decs = [Decision(BUY, ST_CONFIRMED, 80) if i % 2 == 0 else Decision(NO_TRADE, ST_INSUFF, 0) for i in range(40)]
+        tr = simulate(df, f, decs, cfg, 3, 0, 20)
+        # signal i=0 occupe jusqu'à s=3 ; prochain signal admissible i=4
+        self.assertEqual(list(pd.to_datetime(tr["signal_time"]).sub(df.index[0]).dt.total_seconds() / 300), [1.0, 5.0, 9.0, 13.0, 17.0][:len(tr)])
+        self.assertTrue((pd.to_datetime(tr["settle_time"]) <= df.index[19] + pd.Timedelta(minutes=5)).all())
+        cfg2 = Config(min_bars=10, allow_overlap=True)
+        self.assertGreater(len(simulate(df, f, decs, cfg2, 3, 0, 20)), len(tr))
+
+    def test_metrics(self):
+        cfg = Config(payout=0.85, initial_capital=1000, stake_fraction=0.01, min_trades_reliable=300)
+        tr = pd.DataFrame({"result": [WIN, WIN, LOSS, LOSS, LOSS, WIN, PUSH]})
+        tr["pnl"] = [pnl_of(r, cfg) for r in tr["result"]]
+        m = compute_metrics(tr, cfg)
+        self.assertEqual((m["wins"], m["losses"], m["pushes"], m["trades"]), (3, 3, 1, 7))
+        self.assertEqual(m["longest_loss_streak"], 3)
+        self.assertAlmostEqual(m["net_pnl"], 3 * 8.5 - 3 * 10)
+        self.assertAlmostEqual(m["win_rate"], 0.5)
+        self.assertIn("INSUFFISANT", m["verdict"])
+        self.assertAlmostEqual(m["breakeven"], 1 / 1.85)
+        e = compute_metrics(pd.DataFrame({"result": [], "pnl": []}), cfg)
+        self.assertEqual(e["trades"], 0)
+
+    def test_verdict_with_large_sample(self):
+        cfg = Config(payout=0.85, min_trades_reliable=300)
+        res = [WIN] * 700 + [LOSS] * 300
+        tr = pd.DataFrame({"result": res})
+        tr["pnl"] = [pnl_of(r, cfg) for r in res]
+        self.assertIn("Avantage statistique", compute_metrics(tr, cfg)["verdict"])
+        res = [WIN] * 300 + [LOSS] * 700
+        tr = pd.DataFrame({"result": res})
+        tr["pnl"] = [pnl_of(r, cfg) for r in res]
+        self.assertIn("Pas d'avantage", compute_metrics(tr, cfg)["verdict"])
+
+    def test_backtest_end_to_end_and_final_lock(self):
+        df = make_demo_data(4000)
+        cfg = Config(expiry_bars=(1,))
+        out_dir, lock = self.p("rep"), self.p("lock.json")
+        import contextlib
+        import io
+        with contextlib.redirect_stdout(io.StringIO()):
+            res = run_backtest(df, cfg, ["dev", "val"], out_dir=out_dir, lock_path=lock)
+            self.assertIn(1, res["dev"])
+            with self.assertRaises(PermissionError):
+                run_backtest(df, cfg, ["test"], final=False, out_dir=out_dir, lock_path=lock)
+            run_backtest(df, cfg, ["test"], final=True, out_dir=out_dir, lock_path=lock)
+            run_backtest(df, cfg, ["test"], final=True, out_dir=out_dir, lock_path=lock)  # même config : OK
+            cfg2 = Config(expiry_bars=(1,), adx_trend_min=30.0)
+            with self.assertRaises(PermissionError):
+                run_backtest(df, cfg2, ["test"], final=True, out_dir=out_dir, lock_path=lock)
+        seg = split_indices(len(df), cfg.split)
+        self.assertEqual(seg["dev"][1], seg["val"][0])
+        self.assertEqual(seg["val"][1], seg["test"][0])
+        self.assertTrue(os.path.exists(os.path.join(out_dir, "backtest_summary.json")))
+
+    def test_random_baseline_near_half(self):
+        rng = np.random.default_rng(0)
+        n = 4000
+        e = rng.normal(1, 0.01, n)
+        tr = pd.DataFrame({"entry_raw": e, "settle": e + rng.normal(0, 0.01, n)})
+        b = random_baseline(tr, Config())
+        self.assertAlmostEqual(b["win_rate"], 0.5, delta=0.02)
+
+    # ---- risque / sécurité
+    def test_martingale_forbidden(self):
+        with self.assertRaises(ValueError):
+            Config(stake_mode="martingale").validate()
+        self.assertEqual(Config().validate().stake_mode, "fixed")
+
+    def test_consecutive_losses_and_kill_switch(self):
+        self.assertEqual(consecutive_losses([LOSS, LOSS, WIN, LOSS]), 2)
+        self.assertEqual(consecutive_losses([WIN, LOSS]), 0)
+        df = make_demo_data(400)
+        now = df.index[-1] + pd.Timedelta(minutes=5, seconds=2)
+
+        class P:
+            def fetch(self, cfg):
+                return df
+        kp = self.p("STOP")
+        j = Journal(self.p("j.db"))
+        set_kill(True, kp)
+        s = scan_once(self.cfg, P(), j, now, Telegram("", ""), kp)
+        self.assertEqual(s.direction, NO_TRADE)
+        self.assertTrue(any("ARRÊT" in v for v in s.vetoes))
+        set_kill(False, kp)
+        self.assertFalse(is_killed(kp))
+
+    def test_scan_stale_and_connection_failure(self):
+        df = make_demo_data(400)
+
+        class P:
+            def fetch(self, cfg):
+                return df
+
+        class Bad:
+            def fetch(self, cfg):
+                raise DataError("réseau coupé")
+        j = Journal(self.p("j2.db"))
+        sent = []
+        tg = Telegram("t", "c", sender=lambda t, c, x: sent.append(x) or True)
+        late = df.index[-1] + pd.Timedelta(hours=5)
+        s = scan_once(self.cfg, P(), j, late, tg, self.p("nostop"))
+        self.assertEqual(s.direction, NO_TRADE)
+        self.assertTrue(any("périmées" in v for v in s.vetoes))
+        self.assertEqual(len(sent), 1)                       # un avertissement
+        scan_once(self.cfg, P(), j, late, tg, self.p("nostop"))
+        self.assertEqual(len(sent), 1)                       # pas de doublon d'avertissement
+        s2 = scan_once(self.cfg, Bad(), j, late, tg, self.p("nostop"))
+        self.assertFalse(s2.data["connection_ok"])
+
+    def test_alert_dedup_and_journal(self):
+        j = Journal(self.p("j3.db"))
+        sig = Signal("EURUSD", "2024-01-01T00:05:00+00:00", "2024-01-01T00:00:00+00:00", "5m", BUY, 1.1,
+                     ST_CONFIRMED, 80, SCORE_NOTE, ["r"], ["i"], [], {"source": "t", "age_seconds": 1.0})
+        self.assertTrue(j.add_signal(sig, 5, 1))
+        self.assertFalse(j.add_signal(sig, 5, 1))
+        key = "EURUSD|5|2024-01-01T00:00:00+00:00"
+        self.assertTrue(j.claim_alert(key))
+        self.assertFalse(j.claim_alert(key))
+        self.assertEqual(len(j.pending("EURUSD", 5)), 1)
+        j.set_outcome(key, LOSS, -10.0)
+        self.assertEqual(j.recent_outcomes("EURUSD", 5, 5), [LOSS])
+        self.assertFalse(Telegram("", "").send("x"))
+
+    def test_scan_end_to_end_valid_signal_structure(self):
+        df = make_demo_data(3000)
+        j = Journal(self.p("j4.db"))
+        sent = []
+        tg = Telegram("t", "c", sender=lambda t, c, x: sent.append(x) or True)
+
+        class P:
+            def fetch(self, cfg):
+                return df
+        decs = all_decisions(compute_features(df, Config()), Config())
+        k = next(i for i, d in enumerate(decs) if d.direction != NO_TRADE and i >= 200)
+        sub = df.iloc[:k + 1]
+
+        class Q:
+            def fetch(self, cfg):
+                return sub
+        now = sub.index[-1] + pd.Timedelta(minutes=5, seconds=1)
+        found = scan_once(Config(), Q(), j, now, tg, self.p("nostop"))
+        self.assertEqual(found.direction, decs[k].direction)
+        again = scan_once(Config(), Q(), j, now, tg, self.p("nostop"))   # même bougie : pas de seconde alerte
+        self.assertEqual(again.direction, found.direction)
+        self.assertTrue(found.reasons and found.invalidations)
+        self.assertEqual(found.setup_state, ST_CONFIRMED)
+        self.assertGreaterEqual(found.score, Config().min_score)
+        self.assertEqual(len(sent), 1)
+        self.assertIn("PAS une probabilité", found.score_note)
+
+    def test_redundancy_report_shape(self):
+        f = compute_features(make_demo_data(1500), self.cfg)
+        r = redundancy_report(f)
+        self.assertEqual(r.shape[0], r.shape[1])
+        self.assertAlmostEqual(r.iloc[0, 0], 1.0)
+
+
+def run_tests() -> int:
+    suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestScanner)
+    res = unittest.TextTestRunner(verbosity=2).run(suite)
+    return 0 if res.wasSuccessful() else 1
+
+
+# ======================================================================================
+# FICHIERS ANNEXES (python scanner.py init)
+# ======================================================================================
+ENV_EXAMPLE = """# Copie ce fichier en .env. N'y mets JAMAIS d'identifiants de courtier ni de clé privée.
+TWELVEDATA_API_KEY=
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+SCANNER_SYMBOL=EURUSD
+SCANNER_TIMEFRAME_MIN=5
+SCANNER_PAYOUT=0.85
+"""
+REQUIREMENTS = "numpy>=1.24\npandas>=2.0\nstreamlit>=1.50\nplotly>=5.18\n"
+GITIGNORE = ".env\n.venv/\n__pycache__/\n*.db\nreports/\nSTOP\nfinal_test.lock.json\n*.csv\n"
+
+
+def init_files() -> None:
+    files = {".env.example": ENV_EXAMPLE, "requirements.txt": REQUIREMENTS, ".gitignore": GITIGNORE,
+             "README.md": "# Scanner de marché\n\n```text" + (__doc__ or "") + "```\n"}
+    for name, content in files.items():
+        if os.path.exists(name):
+            print(f"= {name} existe déjà (non modifié)")
+            continue
+        with open(name, "w", encoding="utf-8") as fh:
+            fh.write(content)
+        print(f"+ {name} créé")
+
+
+# ======================================================================================
+# CLI
+# ======================================================================================
+def _provider_from_args(a, cfg: Config):
+    if a.provider == "twelvedata":
+        return TwelveDataProvider()
+    if not a.csv:
+        raise SystemExit("--csv requis avec --provider csv")
+    return CSVProvider(a.csv)
+
+
+def cli(argv=None) -> int:
+    load_dotenv_simple()
+    ap = argparse.ArgumentParser(description="Scanner de marché (analyse, backtest honnête, alertes).")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    def common(p):
+        p.add_argument("--csv")
+        p.add_argument("--csv-tz", default="UTC")
+        p.add_argument("--symbol", default=os.environ.get("SCANNER_SYMBOL", "EURUSD"))
+        p.add_argument("--tf", type=int, default=int(os.environ.get("SCANNER_TIMEFRAME_MIN", "5")))
+        p.add_argument("--payout", type=float, default=float(os.environ.get("SCANNER_PAYOUT", "0.85")))
+        p.add_argument("--provider", choices=["csv", "twelvedata"], default="csv")
+
+    sub.add_parser("init")
+    sub.add_parser("test")
+    sub.add_parser("stop")
+    sub.add_parser("resume")
+    d = sub.add_parser("demo-data")
+    d.add_argument("--out", default="demo.csv")
+    d.add_argument("--n", type=int, default=6000)
+    d.add_argument("--seed", type=int, default=7)
+    b = sub.add_parser("backtest")
+    common(b)
+    b.add_argument("--stage", choices=["dev", "val", "test", "all"], default="dev")
+    b.add_argument("--final", action="store_true")
+    b.add_argument("--expiries", default="1,2,3")
+    r = sub.add_parser("redundancy")
+    common(r)
+    s = sub.add_parser("scan")
+    common(s)
+    s.add_argument("--as-of")
+    s.add_argument("--loop", action="store_true")
+    s.add_argument("--interval", type=int, default=60)
+    a = ap.parse_args(argv)
+
+    if a.cmd == "init":
+        init_files()
+        return 0
+    if a.cmd == "test":
+        return run_tests()
+    if a.cmd == "stop":
+        set_kill(True)
+        print("Arrêt d'urgence activé (fichier STOP).")
+        return 0
+    if a.cmd == "resume":
+        set_kill(False)
+        print("Arrêt d'urgence levé.")
+        return 0
+    if a.cmd == "demo-data":
+        make_demo_data(a.n, 5, a.seed).rename_axis("time").reset_index().to_csv(a.out, index=False)
+        print(f"{a.out} écrit : données SYNTHÉTIQUES, sans valeur de performance.")
+        return 0
+
+    cfg = Config(symbol=a.symbol, timeframe_min=a.tf, payout=a.payout, csv_timezone=a.csv_tz)
+    if a.cmd == "backtest":
+        cfg.expiry_bars = tuple(int(x) for x in a.expiries.split(","))
+    cfg.validate()
+    provider = _provider_from_args(a, cfg)
+    if a.cmd == "backtest":
+        df = provider.fetch(cfg)
+        stages = ["dev", "val", "test"] if a.stage == "all" else [a.stage]
+        try:
+            run_backtest(df, cfg, stages, final=a.final)
+        except (PermissionError, DataError) as exc:
+            print(f"ERREUR : {exc}")
+            return 2
+        return 0
+    if a.cmd == "redundancy":
+        f = compute_features(provider.fetch(cfg), cfg)
+        rep = redundancy_report(f)
+        print(rep.round(2).to_string())
+        high = [(i, j, rep.loc[i, j]) for k, i in enumerate(rep.index) for j in rep.columns[k + 1:]
+                if abs(rep.loc[i, j]) >= 0.7]
+        for i, j, v in high:
+            print(f"REDONDANCE (|corr|={v:.2f}) : « {i} » vs « {j} » — ne pas compter comme deux confirmations.")
+        return 0
+    if a.cmd == "scan":
+        journal = Journal(cfg.journal_path)
+        while True:
+            now = pd.Timestamp(a.as_of, tz="UTC") if a.as_of else pd.Timestamp.now(tz="UTC")
+            sig = scan_once(cfg, provider, journal, now)
+            print(sig.to_text())
+            if not a.loop:
+                return 0
+            if is_killed():
+                print("Arrêt d'urgence : boucle interrompue.")
+                return 0
+            time.sleep(a.interval)
+    return 0
+
+
+def _in_streamlit() -> bool:
+    try:
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+        return get_script_run_ctx() is not None
+    except Exception:
+        return False
+
+
+if _in_streamlit():
+    dashboard_main()
+elif __name__ == "__main__":
+    sys.exit(cli())
