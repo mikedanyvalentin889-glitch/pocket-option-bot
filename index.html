@@ -67,6 +67,7 @@ canvas#cv{cursor:crosshair}
 <div class="cd"><h2>Réglages du trade</h2><div class="row s">Expiration<select id="exp"><option>3</option><option>5</option><option>10</option><option>30</option><option>60</option></select>s
 Délai<input class="n" id="dl" type="number" min="0" value="1">s Paiement<input class="n" id="pay" type="number" min="1" max="100" value="85">%</div>
 <label class="s" style="display:block;margin-top:10px"><input id="fo" type="checkbox" checked style="width:auto"> Forcer BUY ou SELL à chaque scan (confiance faible si les règles strictes disent NO TRADE)</label>
+<select id="fm" aria-label="Mode forcé" style="margin-top:8px;width:100%"><option value="micro">Forcé : suivre le mouvement des 9 dernières secondes</option><option value="trend">Forcé : suivre la tendance 1 min</option><option value="contre">Forcé : parier sur le retour (contre le mouvement)</option></select>
 <div class="s" id="last" style="margin-top:8px">Dernier signal : aucun</div></div>
 </aside>
 
@@ -196,9 +197,10 @@ function after(){if(!C.length)return;const c=C[C.length-1];$('px').textContent=c
 function scan(){nextScan=Date.now()+3000;const sb=$('scan');sb.classList.add('flash');setTimeout(()=>sb.classList.remove('flash'),350);if(C.length<3||!lastTick)return;const cl=C.slice(-400),I=ind(cl),i=cl.length-1;cur={I,cl};ps.push(cl[i].c);ps=ps.slice(-10);
  if(!fresh()){ago();return}const L=ps.length,s1=L>2?Math.sign(ps[L-1]-ps[L-2]):0,s2=L>2?Math.sign(ps[L-2]-ps[L-3]):0,mm=s1&&s1===s2?s1:0,r=decide(I,i,mm);if(!r.d&&$("fo").checked&&cl.length>=30)force(r,I,i,mm,s1);
  ren(r,I,i);if(r.d&&(r.forced||!pend.length))fire(r,cl[i]);draw()}
-function force(r,I,i,mm,s1){const g=x=>Math.sign(x)||0,v=[g(I.e9[i]-I.e21[i]),g(I.e21[i]-I.e50[i]),g(I.mh[i]),g(I.rsi[i]-50),g(I.c[i]-I.e9[i]),mm||s1],sm=v.reduce((a,b)=>a+b,0),d=sm>0?1:sm<0?-1:(s1||1),ag=v.filter(x=>x===d).length,b=r.blk.slice();
- r.d=d;r.forced=true;r.sc=Math.round(ag/6*50);r.state='Direction forcée · confiance faible';
- r.why=[ag+' indicateurs sur 6 penchent '+(d>0?'à la hausse':'à la baisse')+' (EMA 9/21/50, MACD, RSI, prix vs EMA 9, élan 3 s)','⚠ Règles strictes non remplies : '+(b.join(' ; ')||'—')];r.inv=["Le sens peut s'inverser dès le prochain scan (3 s)"]}
+function force(r,I,i,mm,s1){const g=x=>Math.sign(x)||0,L=ps.length,m=k=>L>k+1?g(ps[L-1-k]-ps[L-2-k]):0,mic=m(0)*2+m(1)+m(2),tr=g(I.e9[i]-I.e21[i])+g(I.e21[i]-I.e50[i]),mode=$('fm').value,sm=mode==='trend'?tr:mode==='contre'?-mic:mic,
+ d=sm>0?1:sm<0?-1:(g(I.c[i]-I.o[i])||(tr>0?1:-1)),b=r.blk.slice(),lab={micro:'suit le mouvement des 9 dernières secondes',trend:'suit la tendance EMA 9/21/50',contre:'parie sur le retour après le mouvement des 9 dernières secondes'}[mode];
+ r.d=d;r.forced=true;r.sc=Math.min(50,Math.abs(sm)*12);r.state='Direction forcée · confiance faible';
+ r.why=['Mode forcé : '+lab+' (élan '+(mic>0?'haussier':mic<0?'baissier':'neutre')+', tendance 1 min '+(tr>0?'haussière':tr<0?'baissière':'neutre')+')','⚠ Règles strictes non remplies : '+(b.join(' ; ')||'—')];r.inv=["Le sens peut s'inverser dès le prochain scan (3 s)"]}
 setInterval(()=>{const now=Date.now(),a=$('auto').checked;if(a&&now>=nextScan)scan();$('cdb').style.width=(a?Math.min(100,Math.max(0,100-(nextScan-now)/30)):0)+'%'},100);
 setInterval(()=>{if(dirty&&C.length>2){dirty=false;const cl=C.slice(-400);cur={I:ind(cl),cl};draw()}},250);
 
