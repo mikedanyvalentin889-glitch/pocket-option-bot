@@ -38,6 +38,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:5px;borde
 <h2>Indicateurs</h2><div class="g" id="ind"></div>
 <h2>Test de trade</h2><div class="r s">Expiration<select id="exp"><option>3</option><option>5</option><option>10</option><option>30</option><option>60</option></select>s
 Délai<input class="n" id="dl" type="number" min="0" value="1">s Paiement<input class="n" id="pay" type="number" min="1" max="100" value="85">%</div>
+<label class="s" style="display:block;margin-top:8px"><input id="fo" type="checkbox" checked style="width:auto"> Forcer BUY ou SELL à chaque scan (confiance faible quand les règles strictes disent NO TRADE)</label>
 <div class="s" id="last" style="margin-top:6px">Dernier signal : aucun</div></section>
 
 <section class="p f"><h2>Résultats LIVE (simulés, aucun argent réel)</h2>
@@ -136,20 +137,24 @@ const streak=a=>{let m=0,k=0;a.forEach(v=>{k=v<0?k+1:0;m=Math.max(m,k)});return 
 function stats(){const a=S.a,n=a.filter(v=>v!==0).length,w=a.filter(v=>v>0).length,p=a.reduce((x,y)=>x+y,0),[lo,hi]=wil(w,n),pay=cfg().p;
  $('kn').textContent=n;$('kw').textContent=n?Math.round(w/n*100)+'%':'—';$('kp').textContent=p.toFixed(2);$('ks').textContent=streak(a);
  $('kx').innerHTML=`Intervalle de confiance 95 % : ${n?Math.round(lo*100)+'–'+Math.round(hi*100)+'%':'—'} · espérance : ${n?(p/n).toFixed(3):'—'} par mise · seuil de rentabilité : ${(100/(1+pay)).toFixed(1)}%`+(n<100?` · <span class="wa">échantillon insuffisant (&lt;100)</span>`:'');
- $('log').innerHTML=S.log.slice(0,40).map(h=>`<div>${new Date(h.t).toLocaleTimeString()} · ${h.s} · ${h.d>0?'BUY':'SELL'} · ${h.r==='annulé'?'annulé (données périmées)':h.r==='nul'?'nul':h.r==='gagné'?'<span class="up">gagné</span>':'<span class="dn">perdu</span>'}${h.e?` · entrée ${h.e}`:''}</div>`).join('')||'<span class="s">Les signaux et leurs résultats apparaîtront ici.</span>';eqc('eq',a)}
+ const B=S.b||[],bn=B.filter(v=>v!==0).length,bw=B.filter(v=>v>0).length;if(bn)$('kx').innerHTML+=`<br>Signaux forcés : ${bn} trades · ${Math.round(bw/bn*100)}% de réussite · signaux stricts : ${n-bn} trades · ${n-bn?Math.round((w-bw)/(n-bn)*100)+'%':'—'}`;
+ $('log').innerHTML=S.log.slice(0,40).map(h=>`<div>${new Date(h.t).toLocaleTimeString()} · ${h.s} · ${h.d>0?'BUY':'SELL'}${h.f?' (forcé)':''} · ${h.r==='annulé'?'annulé (données périmées)':h.r==='nul'?'nul':h.r==='gagné'?'<span class="up">gagné</span>':'<span class="dn">perdu</span>'}${h.e?` · entrée ${h.e}`:''}</div>`).join('')||'<span class="s">Les signaux et leurs résultats apparaîtront ici.</span>';eqc('eq',a)}
 
 /* ---------- signaux, règlement, alertes ---------- */
-function fire(r,k){const t=k.t;const g={t,d:r.d,s:sym,p:k.c,t0:Date.now(),eP:null,tE:0};pend.push(g);sigs.push({t,d:r.d});sigs=sigs.slice(-60);
- $('last').innerHTML=`Dernier signal : <b class="${r.d>0?'up':'dn'}">${r.d>0?'BUY':'SELL'}</b> ${PAIRS[sym]||sym.slice(3)} à ${new Date().toLocaleTimeString()} · prix observé ${k.c.toFixed(dg(k.c))} · ${r.state} · score ${r.sc}`;
- if(tg&&(lastTg.d!==r.d||Date.now()-lastTg.t>30000)&&(lastTg={d:r.d,t:Date.now()}))fetch(`https://api.telegram.org/bot${tg.t}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:tg.c,text:`${r.d>0?'BUY':'SELL'} ${PAIRS[sym]||sym.slice(3)}\n${new Date().toLocaleString()} · ${TF===60000?'1 min':'1 s'} · prix observé ${k.c.toFixed(dg(k.c))}\nScore ${r.sc}/100 (pas une probabilité)\nRaisons : ${r.why.join(' ; ')}\nInvalidation : ${r.inv.join(' ; ')}\nLimites : prix ≠ Pocket Option, résultats non garantis, aucune exécution automatique.`})}).catch(()=>{})}
+function fire(r,k){const t=k.t;const g={t,d:r.d,s:sym,p:k.c,t0:Date.now(),eP:null,tE:0,f:!!r.forced};pend.push(g);sigs.push({t,d:r.d});sigs=sigs.slice(-60);
+ $('last').innerHTML=`Dernier signal : <b class="${r.d>0?'up':'dn'}">${r.d>0?'BUY':'SELL'}</b>${r.forced?' (forcé)':''} ${PAIRS[sym]||sym.slice(3)} à ${new Date().toLocaleTimeString()} · prix observé ${k.c.toFixed(dg(k.c))} · ${r.state} · score ${r.sc}`;
+ if(tg&&!r.forced&&(lastTg.d!==r.d||Date.now()-lastTg.t>30000)&&(lastTg={d:r.d,t:Date.now()}))fetch(`https://api.telegram.org/bot${tg.t}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:tg.c,text:`${r.d>0?'BUY':'SELL'} ${PAIRS[sym]||sym.slice(3)}\n${new Date().toLocaleString()} · ${TF===60000?'1 min':'1 s'} · prix observé ${k.c.toFixed(dg(k.c))}\nScore ${r.sc}/100 (pas une probabilité)\nRaisons : ${r.why.join(' ; ')}\nInvalidation : ${r.inv.join(' ; ')}\nLimites : prix ≠ Pocket Option, résultats non garantis, aucune exécution automatique.`})}).catch(()=>{})}
 function settle(p){const now=Date.now(),c=cfg();pend=pend.filter(g=>{
  if(!g.eP){if(now<g.t0+c.d*1000)return true;g.eP=p;g.tE=now;return true}
  if(now<g.tE+c.e*1000)return true;const res=p===g.eP?'nul':(g.d>0?p>g.eP:p<g.eP)?'gagné':'perdu';
- S.a.push(res==='nul'?0:res==='gagné'?c.p:-1);S.log.unshift({t:g.t0,s:g.s,d:g.d,r:res,e:g.eP.toFixed(dg(g.eP))});S.a=S.a.slice(-2000);S.log=S.log.slice(0,100);save();stats();return false})}
+ const v=res==='nul'?0:res==='gagné'?c.p:-1;S.a.push(v);if(g.f){S.b=S.b||[];S.b.push(v);S.b=S.b.slice(-2000)}S.log.unshift({t:g.t0,s:g.s,d:g.d,f:g.f,r:res,e:g.eP.toFixed(dg(g.eP))});S.a=S.a.slice(-2000);S.log=S.log.slice(0,100);save();stats();return false})}
 function after(){if(!C.length)return;const c=C[C.length-1];$('px').textContent=c.c.toLocaleString('en-US',{maximumFractionDigits:dg(c.c)});settle(c.c);if(!cur)scan()}
 function scan(){nextScan=Date.now()+3000;if(C.length<3||!lastTick)return;const cl=C.slice(-400),I=ind(cl),i=cl.length-1;cur={I,cl};ps.push(cl[i].c);ps=ps.slice(-10);
- if(!fresh()){ago();return}const L=ps.length,s1=L>2?Math.sign(ps[L-1]-ps[L-2]):0,s2=L>2?Math.sign(ps[L-2]-ps[L-3]):0,r=decide(I,i,s1&&s1===s2?s1:0);
- ren(r,I,i);if(r.d&&!pend.length)fire(r,cl[i]);draw()}
+ if(!fresh()){ago();return}const L=ps.length,s1=L>2?Math.sign(ps[L-1]-ps[L-2]):0,s2=L>2?Math.sign(ps[L-2]-ps[L-3]):0,mm=s1&&s1===s2?s1:0,r=decide(I,i,mm);if(!r.d&&$("fo").checked&&cl.length>=30)force(r,I,i,mm,s1);
+ ren(r,I,i);if(r.d&&(r.forced||!pend.length))fire(r,cl[i]);draw()}
+function force(r,I,i,mm,s1){const g=x=>Math.sign(x)||0,v=[g(I.e9[i]-I.e21[i]),g(I.e21[i]-I.e50[i]),g(I.mh[i]),g(I.rsi[i]-50),g(I.c[i]-I.e9[i]),mm||s1],sm=v.reduce((a,b)=>a+b,0),d=sm>0?1:sm<0?-1:(s1||1),ag=v.filter(x=>x===d).length,b=r.blk.slice();
+ r.d=d;r.forced=true;r.sc=Math.round(ag/6*50);r.state='Direction forcée · confiance faible';
+ r.why=[ag+' indicateurs sur 6 penchent '+(d>0?'à la hausse':'à la baisse')+' (EMA 9/21/50, MACD, RSI, prix vs EMA 9, élan 3 s)','⚠ Règles strictes non remplies : '+(b.join(' ; ')||'—')];r.inv=["Le sens peut s'inverser dès le prochain scan (3 s)"]}
 setInterval(scan,3000);
 
 /* ---------- flux de données ---------- */
@@ -198,7 +203,7 @@ $('bt').onclick=async()=>{const o=$('bto');if(fx()){o.textContent='Backtest indi
 $('tf').onchange=e=>{TF=+e.target.value;sigs=[];start()};
 sel.onchange=()=>{sym=sel.value;sigs=[];start()};
 $('stop').onclick=e=>{stopped=!stopped;e.target.textContent=stopped?'Reprendre':'Arrêter';if(stopped){ws&&(ws.onclose=null,ws.close());$('st').textContent='Arrêté';$('dot').className='dot';pend=[]}else start()};
-$('rst').onclick=()=>{S={a:[],log:[]};save();stats()};
+$('rst').onclick=()=>{S={a:[],b:[],log:[]};save();stats()};
 $('tt').onclick=()=>{const t=$('tk').value.trim(),c=$('ci').value.trim();if(t&&c){tg={t,c};try{localStorage.setItem('sr_tg',JSON.stringify(tg))}catch(e){}$('tt').textContent='Activé'}else{tg=null;try{localStorage.removeItem('sr_tg')}catch(e){}$('tt').textContent='Activer'}};
 try{$('key').value=localStorage.getItem('sr_key')||'';const q=JSON.parse(localStorage.getItem('sr_tg'));if(q){tg=q;$('tk').value=q.t;$('ci').value=q.c;$('tt').textContent='Activé'}}catch(e){}
 $('key').onchange=e=>{try{localStorage.setItem('sr_key',e.target.value.trim())}catch(x){}start()};
