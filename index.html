@@ -73,7 +73,7 @@ footer{color:var(--muted);font-size:12px;padding:10px 0 30px}
         <select id="src"><option value="demo">Démonstration (synthétique)</option><option value="csv">Fichier CSV</option><option value="td">Twelve Data (FX réel)</option></select></div>
       <div><label for="symbol">Actif</label><input type="text" id="symbol" value="EURUSD"></div>
       <div><label for="tf">Unité de temps</label>
-        <select id="tf"><option>1</option><option selected>5</option><option>15</option><option>30</option><option>60</option></select></div>
+        <select id="tf"><option selected>1</option><option>5</option><option>15</option><option>30</option><option>60</option></select></div>
       <div><label for="payout">Taux de paiement</label><input type="number" id="payout" value="0.85" step="0.01" min="0.5" max="0.99"></div>
     </div>
     <div id="srcCsv" class="hide">
@@ -85,9 +85,7 @@ footer{color:var(--muted);font-size:12px;padding:10px 0 30px}
     <div id="srcTd" class="hide">
       <div class="grid" style="margin-top:10px">
         <div><label for="apikey">Clé API Twelve Data (reste dans CE navigateur)</label><input type="password" id="apikey" autocomplete="off" placeholder="ta clé"></div>
-        <div><label for="nbars">Bougies à télécharger</label><input type="number" id="nbars" value="1500" min="200" max="30000" step="100"></div>
-        <div><label for="auto">Rafraîchir automatiquement</label>
-          <select id="auto"><option value="0">Non</option><option value="1">Toutes les minutes</option><option value="5">Toutes les 5 min</option></select></div>
+        <div><label for="nbars">Bougies à télécharger</label><input type="number" id="nbars" value="5000" min="200" max="30000" step="100"></div>
       </div>
       <p class="muted" style="font-size:12px;margin:6px 0 0">La clé n'est jamais envoyée ailleurs que chez Twelve Data. Elle n'est pas dans le code du site. Au-delà de 5000 bougies, le téléchargement se fait par morceaux (limite gratuite : 8 requêtes par minute, 800 par jour).</p>
     </div>
@@ -96,6 +94,17 @@ footer{color:var(--muted);font-size:12px;padding:10px 0 30px}
       <button id="btnKill" class="danger">ARRÊT D'URGENCE</button>
       <span id="status" class="muted"></span>
     </div>
+  </div>
+
+  <div class="card" id="watchCard">
+    <h2>Surveillance en direct (une analyse à chaque bougie)</h2>
+    <div class="row" style="margin-top:0">
+      <button id="btnWatch">Démarrer la surveillance</button>
+      <label style="margin:0"><input type="checkbox" id="snd" checked> Son + notification quand un signal apparaît</label>
+    </div>
+    <div id="wstat" class="muted" style="margin:8px 0;font-size:13px">Source « Twelve Data » + clé API requises. Garde cet onglet ouvert et visible (sur téléphone : écran allumé).</div>
+    <div id="wbig"></div>
+    <div id="wlog"></div>
   </div>
 
   <div class="card" id="scanCard">
@@ -125,9 +134,11 @@ footer{color:var(--muted);font-size:12px;padding:10px 0 30px}
   <div class="card">
     <h2>4. Backtest</h2>
     <div class="grid">
-      <div><label for="expiries">Expirations testées (en bougies)</label><input type="text" id="expiries" value="1,2,3"></div>
+      <div><label for="expiries">Expirations testées (en bougies)</label><input type="text" id="expiries" value="1"></div>
       <div><label for="slip">Glissement défavorable (unité de prix)</label><input type="number" id="slip" value="0" step="0.00001" min="0"></div>
+      <div><label for="delay">Retard d'entrée (bougies)</label><select id="delay"><option value="0">0 — entrée à l'ouverture suivante (optimiste)</option><option value="1">1 — entrée une bougie plus tard (réaliste en 1 min)</option></select></div>
     </div>
+    <p class="warn" id="tfNote" style="font-size:13px;margin:8px 0 0"></p>
     <div class="row">
       <button id="btnDev" class="sec">Développement (60 %)</button>
       <button id="btnVal" class="sec">Validation (20 %)</button>
@@ -178,7 +189,7 @@ const SCORE_NOTE = "Score de règles 0-100. Ce n'est PAS une probabilité de gai
 
 function defaultCfg() {
   return { symbol: 'EURUSD', tf: 5, expiries: [1, 2, 3], liveExpiry: 1, payout: 0.85, capital: 1000, stakeFrac: 0.01,
-    slippage: 0, minBars: 150, maxMissing: 0.05, staleBars: 2, adxTrend: 22, adxRange: 18, atrSpike: 2,
+    slippage: 0, entryDelay: 0, minBars: 150, maxMissing: 0.05, staleBars: 2, adxTrend: 22, adxRange: 18, atrSpike: 2,
     rsiLong: 50, rsiShort: 50, pivotK: 3, srLookback: 100, srRoom: 0.5, minScore: 60, macdVeto: false,
     maxLossStreak: 5, allowOverlap: false, split: [0.6, 0.2, 0.2], minTrades: 300 };
 }
@@ -481,10 +492,10 @@ function naiveDirs(f) {
 
 /* ---------- Règlement et backtest ---------- */
 function settle(d, i, dir, N, cfg, end) {
-  const n = end === undefined ? d.n : end, e = i + 1, s = i + N;
+  const D = cfg.entryDelay || 0, n = end === undefined ? d.n : end, e = i + 1 + D, s = i + N + D;
   if (s > n - 1) return { status: 'unavailable' };
   const tf = cfg.tf * 60000;
-  if (d.t[e] - d.t[i] !== tf || d.t[s] - d.t[e] !== (N - 1) * tf) return { status: 'gap' };
+  if (d.t[e] - d.t[i] !== (1 + D) * tf || d.t[s] - d.t[e] !== (N - 1) * tf) return { status: 'gap' };
   const raw = d.o[e], entry = dir === BUY ? raw + cfg.slippage : raw - cfg.slippage, st = d.c[s];
   const res = dir === BUY ? (st > entry ? WIN : st < entry ? LOSS : PUSH) : (st < entry ? WIN : st > entry ? LOSS : PUSH);
   return { status: 'ok', e, s, entryRaw: raw, entry, settle: st, result: res };
@@ -567,7 +578,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
   del(k) { try { localStorage.removeItem(k); } catch (e) {} }
 };
-const st = { d: null, f: null, decs: null, cfg: null, live: false, source: '', timer: null, notes: [] };
+const st = { d: null, f: null, decs: null, cfg: null, live: false, source: '', timer: null, notes: [], last: null };
 const fmtT = ms => new Date(ms).toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
 const pct = x => Number.isNaN(x) ? 'n/a' : (x * 100).toFixed(1) + ' %';
 const status = (msg, cls) => { const e = $('status'); e.textContent = msg; e.className = cls || 'muted'; };
@@ -575,7 +586,7 @@ const status = (msg, cls) => { const e = $('status'); e.textContent = msg; e.cla
 function readCfg() {
   const c = S.defaultCfg();
   c.symbol = $('symbol').value.trim().toUpperCase() || 'EURUSD'; c.tf = parseInt($('tf').value, 10); c.payout = parseFloat($('payout').value);
-  c.expiries = $('expiries').value.split(',').map(x => parseInt(x.trim(), 10)).filter(x => !Number.isNaN(x)); c.slippage = parseFloat($('slip').value) || 0;
+  c.expiries = $('expiries').value.split(',').map(x => parseInt(x.trim(), 10)).filter(x => !Number.isNaN(x)); c.slippage = parseFloat($('slip').value) || 0; c.entryDelay = parseInt($('delay').value, 10) || 0;
   return S.checkCfg(c);
 }
 
@@ -602,7 +613,7 @@ async function fetchTD(cfg, key, nbars) {
 }
 
 async function loadData() {
-  const src = $('src').value; $('btnLoad').disabled = true; status('Chargement…');
+  const src = $('src').value; $('btnLoad').disabled = true; status('Chargement…'); let okLoad = false;
   try {
     st.cfg = readCfg(); let d;
     if (src === 'demo') d = S.makeDemo(30000, st.cfg.tf, 11);
@@ -614,9 +625,9 @@ async function loadData() {
       d = await fetchTD(st.cfg, key, parseInt($('nbars').value, 10) || 1500);
     }
     st.live = src === 'td'; st.source = src === 'demo' ? 'SYNTHETIC_DEMO' : src === 'csv' ? 'CSV:' + $('file').files[0].name : 'TwelveData';
-    st.dRaw = d; analyse(); status(d.n + ' bougies chargées (' + st.source + ')', 'ok');
+    st.dRaw = d; analyse(); status(d.n + ' bougies chargées (' + st.source + ')', 'ok'); okLoad = true;
   } catch (e) { status(e.message, 'bad'); }
-  $('btnLoad').disabled = false; setAuto();
+  $('btnLoad').disabled = false; setAuto(); return okLoad;
 }
 
 function analyse() {
@@ -626,7 +637,7 @@ function analyse() {
   if (d.n < 3) { $('scanOut').innerHTML = '<span class="bad">Données insuffisantes.</span>'; return; }
   st.f = S.computeFeatures(d, cfg); st.decs = S.allDecisions(d, st.f, cfg);
   if (st.live) { resolveJournal(); }
-  scanLast(); draw(); renderRisk();
+  st.last = scanLast(); renderBig(); draw(); renderRisk();
 }
 
 /* ---------- journal (navigateur uniquement, signaux EN DIRECT seulement) ---------- */
@@ -667,9 +678,11 @@ function scanLast() {
     '<div><b>Source</b>' + esc(st.source) + '</div><div><b>Fraîcheur</b>' + (dq.ageSeconds === null || dq.ageSeconds === undefined ? 'n/a (rejeu)' : (dq.ageSeconds / 60).toFixed(1) + ' min') + '</div>' +
     '<div><b>Qualité des données</b>' + (dq.ok ? '<span class="ok">OK</span>' : '<span class="bad">INVALIDE</span>') + '</div><div><b>Bougies</b>' + dq.n + ' (manquantes : ' + (dq.missing || 0) + ')</div></div>' +
     '<div class="muted" style="font-size:12px">' + esc(S.SCORE_NOTE) + '</div>' +
+    (dec.direction !== S.NO ? '<p class="warn">Si tu prends ce signal : entrée à l\'ouverture de la bougie de ' + fmtT(barOpen + tfMs).slice(11, 19) + ' UTC, expiration ' + cfg.liveExpiry * cfg.tf + ' min plus tard. Le prix réel d\'entrée peut différer du prix observé.</p>' : '') +
     (dec.reasons.length ? '<h3>Raisons</h3>' + li(dec.reasons) : '') + (dec.vetoes.length ? '<h3>Blocages</h3>' + li(dec.vetoes) : '') +
     (dec.invalidations.length ? '<h3>L\'analyse est invalidée si</h3>' + li(dec.invalidations) : '') + (extra.length ? '<p class="ok">' + extra.join(' ') + '</p>' : '') +
     (!dq.ok && dq.issues.length ? '<p class="warn">Signaux suspendus : ' + esc(dq.issues.join(' | ')) + '</p>' : '');
+  return { dec, isNew: extra.length > 0, barOpen };
 }
 
 /* ---------- graphique ---------- */
@@ -776,16 +789,86 @@ function renderRisk() {
 }
 
 /* ---------- câblage ---------- */
-function setAuto() {
-  clearInterval(st.timer); st.timer = null; const m = parseInt($('auto').value, 10);
-  if ($('src').value !== 'td' || !m || store.get('killed', false)) return;
-  st.timer = setInterval(() => { if (!store.get('killed', false)) loadData(); else setAuto(); }, m * 60000);
+function setAuto() { if (W.on && ($('src').value !== 'td' || store.get('killed', false))) stopWatch("Surveillance arrêtée (arrêt d'urgence ou changement de source)."); }
+
+/* ---------- surveillance en direct ---------- */
+const W = st.watch = { on: false, to: null, cd: null, retries: 0, log: [], nextAt: 0, audio: null, lock: null };
+function beep(dir) {
+  try { const a = W.audio; if (!a) return; const o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.frequency.value = dir === S.BUY ? 880 : 440; g.gain.value = 0.15; o.start(); o.stop(a.currentTime + 0.3); } catch (e) {}
+}
+function renderBig() {
+  const r = st.last; if (!r || !st.d) return; const dec = r.dec, cfg = st.cfg;
+  const cls = dec.direction === S.BUY ? 'BUY' : dec.direction === S.SELL ? 'SELL' : 'NONE';
+  const label = dec.direction === S.BUY ? 'ACHAT — BUY' : dec.direction === S.SELL ? 'VENTE — SELL' : 'ATTENDRE — NO TRADE';
+  const age = st.live && st.dq && st.dq.ageSeconds !== null && st.dq.ageSeconds !== undefined ? st.dq.ageSeconds : null;
+  $('wbig').innerHTML = '<span class="pill ' + cls + '" style="font-size:26px;padding:10px 22px">' + label + '</span>' +
+    '<div class="muted" style="margin-top:6px">' + esc(cfg.symbol) + ' · ' + cfg.tf + ' min · prix ' + st.d.c[st.d.n - 1].toFixed(5) + ' · bougie clôturée à ' + fmtT(r.barOpen + cfg.tf * 60000).slice(11, 19) + ' UTC' +
+    (age !== null ? ' · analyse âgée de ' + Math.round(age) + ' s' : ' · REJEU (pas du direct)') + '</div>' +
+    (age !== null && dec.direction !== S.NO && age > 20 ? '<p class="warn">Signal vieux de plus de 20 s : le prix a peut-être déjà bougé. Entrée à tes risques.</p>' : '') +
+    (dec.direction !== S.NO ? '<p class="warn" style="margin:6px 0">Entrée à l\'ouverture de la bougie suivante, expiration ' + cfg.liveExpiry * cfg.tf + ' min plus tard. Ce n\'est pas une garantie de gain.</p>' : '') +
+    (dec.direction === S.NO && dec.vetoes.length ? '<div class="muted" style="font-size:13px">' + esc(dec.vetoes[0]) + '</div>' : '');
+}
+function renderLog() {
+  $('wlog').innerHTML = W.log.length ? '<details open><summary>Dernières analyses</summary><table><tr><th>Heure (UTC)</th><th>Décision</th><th>Prix</th><th>Note</th></tr>' +
+    W.log.map(e => '<tr><td>' + new Date(e.t).toISOString().slice(11, 19) + '</td><td>' + esc(e.dir) + '</td><td>' + (e.price ? e.price.toFixed(5) : '') + '</td><td>' + esc(e.msg || '') + '</td></tr>').join('') + '</table></details>' : '';
+}
+function logAdd(dir, price, msg) { W.log.unshift({ t: Date.now(), dir, price, msg }); W.log = W.log.slice(0, 12); renderLog(); }
+function alertUser(r) {
+  if (!$('snd').checked) return; const dir = r.dec.direction;
+  beep(dir); try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
+  document.title = (dir === S.BUY ? 'ACHAT ' : 'VENTE ') + st.cfg.symbol + ' !';
+  try { if ('Notification' in window && Notification.permission === 'granted') new Notification((dir === S.BUY ? 'ACHAT (BUY) ' : 'VENTE (SELL) ') + st.cfg.symbol, { body: 'Score de règles ' + r.dec.score + '/100 (pas une probabilité). Expiration ' + st.cfg.liveExpiry * st.cfg.tf + ' min.' }); } catch (e) {}
+}
+function schedule(ms) { clearTimeout(W.to); W.nextAt = Date.now() + ms; W.to = setTimeout(watchTick, ms); }
+function scheduleBoundary() {
+  const tfMs = st.cfg.tf * 60000, now = Date.now(); let next = Math.floor(now / tfMs) * tfMs + 4000; if (next <= now + 500) next += tfMs; schedule(next - now);
+}
+async function watchTick() {
+  if (!W.on) return;
+  try {
+    const cfg = readCfg(); st.cfg = cfg; const nd = await fetchTD(cfg, $('apikey').value.trim(), 150);
+    st.dRaw = mergeRows(st.dRaw, nd); analyse(); const r = st.last;
+    logAdd(r.dec.direction, st.d.c[st.d.n - 1], r.dec.direction === S.NO ? (r.dec.vetoes[0] || '') : 'Nouveau signal' + (r.isNew ? '' : ' (déjà vu)'));
+    if (r.dec.direction !== S.NO && r.isNew) alertUser(r);
+    status('Dernière analyse : ' + new Date().toISOString().slice(11, 19) + ' UTC', 'ok');
+  } catch (e) { status(e.message, 'bad'); logAdd('ERREUR', 0, e.message); }
+  if (!W.on) return;
+  const tfMs = st.cfg.tf * 60000, expected = Math.floor(Date.now() / tfMs) * tfMs - tfMs;
+  if (st.d && st.d.t[st.d.n - 1] < expected && W.retries < 3) { W.retries++; schedule(6000); } else { W.retries = 0; scheduleBoundary(); }
+}
+function mergeRows(a, b) {
+  const m = new Map(); for (const d of [a, b]) for (let i = 0; i < d.n; i++) m.set(d.t[i], [d.t[i], d.o[i], d.h[i], d.l[i], d.c[i], d.v[i]]);
+  let rows = Array.from(m.values()).sort((x, y) => x[0] - y[0]); if (rows.length > 20000) rows = rows.slice(-20000); return S.fromRows(rows);
+}
+function stopWatch(msg) {
+  W.on = false; clearTimeout(W.to); clearInterval(W.cd); try { if (W.lock) W.lock.release(); } catch (e) {} W.lock = null;
+  $('btnWatch').textContent = 'Démarrer la surveillance'; $('wstat').textContent = msg || 'Surveillance arrêtée.';
+}
+async function startWatch() {
+  if (W.on) return stopWatch('Surveillance arrêtée.');
+  if ($('src').value !== 'td') { status('La surveillance utilise Twelve Data : choisis cette source et colle ta clé.', 'bad'); return; }
+  if (store.get('killed', false)) { status("Arrêt d'urgence actif : clique dessus pour reprendre.", 'bad'); return; }
+  try { W.audio = W.audio || new (window.AudioContext || window.webkitAudioContext)(); if (W.audio.resume) W.audio.resume(); } catch (e) {}
+  try { if ($('snd').checked && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
+  if (!(await loadData()) || !st.live) return;
+  W.on = true; W.retries = 0; $('btnWatch').textContent = 'Arrêter la surveillance'; scheduleBoundary();
+  try { if (navigator.wakeLock) W.lock = await navigator.wakeLock.request('screen'); } catch (e) {}
+  clearInterval(W.cd); W.cd = setInterval(() => { if (W.on) $('wstat').textContent = 'Surveillance active · prochaine analyse dans ' + Math.max(0, Math.round((W.nextAt - Date.now()) / 1000)) + ' s · ≈ 1 requête Twelve Data par bougie (le plan gratuit : 800/jour)'; }, 1000);
+  $('wstat').textContent = 'Surveillance active.';
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) { document.title = 'Scanner de marché'; if (W.on && Date.now() > W.nextAt + 2000) { clearTimeout(W.to); watchTick(); } }
+});
+window.addEventListener('focus', () => { document.title = 'Scanner de marché'; });
+function syncNote() {
+  const tf = parseInt($('tf').value, 10);
+  $('tfNote').textContent = tf === 1 ? "Mode 1 minute : le signal n'existe qu'après la clôture de la bougie + le délai des données (souvent 30 à 90 s). Teste aussi « retard d'entrée = 1 » : si l'avantage disparaît, il n'était pas exploitable. Payout, spread et latence pèsent beaucoup plus qu'en 5 minutes. Twelve Data gratuit : 800 requêtes/jour, donc un rafraîchissement par minute ne tient que ~13 h." : '';
 }
 function syncSrc() { $('srcCsv').classList.toggle('hide', $('src').value !== 'csv'); $('srcTd').classList.toggle('hide', $('src').value !== 'td'); }
 function syncKill() { const k = store.get('killed', false); $('btnKill').textContent = k ? "ARRÊT D'URGENCE ACTIF — cliquer pour reprendre" : "ARRÊT D'URGENCE"; $('btnKill').className = k ? 'sec' : 'danger'; }
-$('src').onchange = () => { syncSrc(); setAuto(); }; $('auto').onchange = setAuto;
+$('src').onchange = () => { syncSrc(); setAuto(); }; $('tf').onchange = syncNote; syncNote(); $('btnWatch').onclick = startWatch;
 $('btnLoad').onclick = loadData;
-$('btnKill').onclick = () => { store.set('killed', !store.get('killed', false)); syncKill(); setAuto(); if (st.d) { scanLast(); } };
+$('btnKill').onclick = () => { store.set('killed', !store.get('killed', false)); syncKill(); setAuto(); if (st.d) { st.last = scanLast(); renderBig(); } };
 $('btnDev').onclick = () => runBacktest('dev'); $('btnVal').onclick = () => runBacktest('val');
 $('btnTest').onclick = () => { if (confirm("Le test final ne doit être lu qu'une seule fois, règles figées. Continuer ?")) runBacktest('test'); };
 $('btnRed').onclick = runRedundancy;
