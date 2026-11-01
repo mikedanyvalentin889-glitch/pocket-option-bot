@@ -29,7 +29,7 @@
   .sig.buy{border-color:var(--buy);background:rgba(25,214,138,.12)} .sig.buy .big{color:var(--buy)}
   .sig.sell{border-color:var(--sell);background:rgba(255,77,94,.12)} .sig.sell .big{color:var(--sell)}
   .sig.wait{border-color:var(--wait);background:rgba(245,185,66,.1)} .sig.wait .big{color:var(--wait)}
-  .why{font-size:13px;margin:10px 2px;line-height:1.4;min-height:36px}
+  .why{font-size:14px;margin:10px 2px;line-height:1.5;min-height:60px;white-space:pre-line}
   .meta{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin:8px 2px}
   .bar{height:6px;border-radius:4px;background:var(--line);overflow:hidden;margin:6px 0 10px}
   .bar i{display:block;height:100%;width:0;background:var(--buy);transition:width .9s linear}
@@ -136,7 +136,7 @@ $("btnPip").onclick = async ()=>{
     return;
   }
   try{
-    pipWin = await documentPictureInPicture.requestWindow({width:300,height:430});
+    pipWin = await documentPictureInPicture.requestWindow({width:320,height:480});
     pipWin.document.head.appendChild($("css").cloneNode(true));
     pipWin.document.body.style.margin="0";
     pipWin.document.body.style.background="#0b0d12";
@@ -207,14 +207,16 @@ function grab(){
   return c.toDataURL("image/jpeg",0.72);
 }
 
-const PROMPT = `Tu es un analyste technique expert en graphiques de trading à très court terme (bougies de 1 minute).
-L'image est une capture de la plateforme Pocket Option. Regarde le graphique principal : tendance des dernières bougies, momentum, supports/résistances proches, mèches de rejet, et tout indicateur visible (RSI, moyennes mobiles, Bollinger, MACD).
-Décide du signal pour la PROCHAINE bougie de 1 minute :
-- "ACHETER" si la hausse est probable,
-- "VENDRE" si la baisse est probable,
-- "ATTENDRE" si le graphique est confus, en range, illisible, ou si le signal est faible.
-Sois prudent : préfère ATTENDRE quand la confiance est inférieure à 60.
-Réponds UNIQUEMENT avec un JSON : {"signal":"ACHETER|VENDRE|ATTENDRE","confiance":0-100,"raison":"1 phrase courte en français"}`;
+const PROMPT = `Tu es un analyste technique expert en graphiques de trading à court terme.
+L'image est une capture de la plateforme Pocket Option. L'utilisateur va placer un TRADE EN ATTENTE (pending trade) : il choisit un niveau de prix précis où le trade s'ouvrira, une direction et une durée d'expiration.
+Analyse le graphique principal : tendance, momentum, supports et résistances proches, mèches de rejet, zones de retournement, et tout indicateur visible (RSI, moyennes mobiles, Bollinger, MACD).
+Donne un plan de trade complet :
+1. "prix_entree" : le niveau de prix exact (lu sur l'axe des prix à droite, même format et même nombre de décimales) où placer le trade en attente. Choisis un niveau réaliste proche du prix actuel : un support pour ACHETER sur rebond, une résistance pour VENDRE sur rejet, ou une cassure confirmée.
+2. "signal" : la direction à cette barre de prix, ACHETER ou VENDRE. Tu DOIS choisir l'un des deux, jamais d'attente : même si le graphique est difficile, choisis le côté le plus probable et indique une confiance basse.
+3. "duree_min" : la durée d'expiration en minutes, choisie parmi 1, 2, 3 ou 5, adaptée à la vitesse du marché et à la taille des bougies.
+4. "confiance" : de 0 à 100.
+Réponds UNIQUEMENT avec un JSON, sans autre texte :
+{"signal":"ACHETER|VENDRE","prix_entree":"1.08342","duree_min":3,"confiance":0-100,"raison":"1 phrase courte en français (ex : rebond sur support + RSI survendu)"}`;
 
 async function scan(){
   if(busy||!stream) return;
@@ -248,14 +250,16 @@ async function scan(){
     const all=txt.match(/\{[^{}]*\}/g);
     const j=JSON.parse(all?all[all.length-1]:txt);
     setStatus("Scan actif · "+goodModel.split("/").pop());
-    let s=String(j.signal||"ATTENDRE").toUpperCase();
+    const raw=String(j.signal||"").toUpperCase();
+    if(!/ACHET|VEND/.test(raw)) throw new Error("Réponse invalide : "+raw);
+    const s=/VEND/.test(raw)?"VENDRE":"ACHETER";
     const conf=Math.max(0,Math.min(100,parseInt(j.confiance)||0));
-    if(!["ACHETER","VENDRE","ATTENDRE"].includes(s)) s="ATTENDRE";
-    const cls=s==="ACHETER"?"buy":s==="VENDRE"?"sell":"wait";
-    render({signal:s,conf,why:j.raison||""},cls);
-    speak(s==="ACHETER"?"Acheter. Confiance "+conf+" pour cent":
-          s==="VENDRE"?"Vendre. Confiance "+conf+" pour cent":"Attends");
-    addHist(s,conf,cls);
+    const cls=s==="ACHETER"?"buy":"sell";
+    const prix=String(j.prix_entree||"?").trim();
+    const dur=[1,2,3,5].includes(parseInt(j.duree_min))?parseInt(j.duree_min):1;
+    render({signal:s,conf,why:"📍 Placer à la barre : "+prix+"\n⏱ Durée : "+dur+" min\n"+(j.raison||"")},cls);
+    speak((s==="ACHETER"?"Acheter":"Vendre")+" à "+prix.replace(/[.,]/g," virgule ")+", "+dur+(dur>1?" minutes":" minute")+". Confiance "+conf+" pour cent");
+    addHist(s,conf,cls,prix+" · "+dur+"m");
     setStatus("Scan actif");
   }catch(e){
     render({signal:"ERREUR",conf:null,why:e.message},"wait");
@@ -269,10 +273,10 @@ function render(o,cls){
   $("sigConf").textContent=o.conf!=null?("Confiance : "+o.conf+"%"):"";
   $("why").textContent=o.why||"";
 }
-function addHist(s,conf,cls){
-  const t=new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+function addHist(s,conf,cls,extra){
+  const t=new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
   const d=document.createElement("div");
-  d.innerHTML=`<span>${t}</span><b class="${cls}">${s}</b><span>${conf}%</span>`;
+  d.innerHTML=`<span>${t}</span><b class="${cls}">${s}</b><span>${extra||""} · ${conf}%</span>`;
   $("hist").prepend(d);
   while($("hist").children.length>15) $("hist").lastChild.remove();
 }
