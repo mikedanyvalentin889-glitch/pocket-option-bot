@@ -522,7 +522,7 @@ async function scan(){
       }
       if(r.ok){ goodModel=m; break; }
       let msg=body; try{ msg=JSON.parse(body).error.message; }catch(e){}
-      lastErr=m+" → "+r.status+" "+msg.slice(0,200);
+      lastErr=m+" → "+r.status+" "+msg.slice(0,400);
       (window.errs=window.errs||[]).push(lastErr);
       if(r.status===401) throw new Error("Clé Groq invalide (401). Vérifie ta clé.");
       r=null; // 429 ou modèle indisponible : on essaie le modèle suivant (les limites sont par modèle)
@@ -530,8 +530,13 @@ async function scan(){
     if(!r){
       window.candCache=null;
       const all=(window.errs||[]).slice(-4).join(" | "); window.errs=[];
-      const hint=/404|403|permission|access/i.test(all)
-        ? " → Active le modèle qwen/qwen3.8-27b dans console.groq.com (Settings > Model Permissions / Limits)."
+      if(/tokens per day|TPD/i.test(all)){
+        const wait=(all.match(/try again in ([0-9hms.]+)/i)||[])[1];
+        const er=new Error("Quota journalier Groq épuisé (200 000 tokens/jour sur ton plan)."+(wait?" Il se renouvelle dans "+wait+".":"")+" Le scanner passe au moteur local (0 token).");
+        er.tpd=true; throw er;
+      }
+      const hint=/→ 404|→ 403|model_not_found|permission/i.test(all)
+        ? " → Vérifie que qwen/qwen3.8-27b est autorisé dans console.groq.com (Settings > Model Permissions)."
         : "";
       throw new Error((all.includes("→ 429")?"Limite Groq (429). ":"Modèle vision indisponible. ")+all+hint);
     }
@@ -560,8 +565,14 @@ async function scan(){
     }
     setStatus("Scan actif");
   }catch(e){
-    render({signal:"ERREUR",conf:null,why:e.message},"wait");
-    setStatus("Erreur"); speak("Erreur de scan");
+    if(e.tpd){
+      $("engine").value="local";
+      $("learn").textContent="⚠️ "+e.message;
+      setTimeout(scanLocal,100);
+    }else{
+      render({signal:"ERREUR",conf:null,why:e.message},"wait");
+      setStatus("Erreur"); speak("Erreur de scan");
+    }
   }finally{ busy=false; }
 }
 
