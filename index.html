@@ -38,6 +38,10 @@
   .hist{margin-top:10px;font-size:12px;max-height:130px;overflow:auto}
   .hist div{display:flex;justify-content:space-between;padding:4px 2px;border-top:1px solid var(--line);color:var(--mut)}
   .hist b.buy{color:var(--buy)} .hist b.sell{color:var(--sell)} .hist b.wait{color:var(--wait)}
+  .tabs{display:flex;gap:6px;margin-bottom:10px}
+  .tabs button{flex:1;padding:9px;font-size:12px;background:#222a3a;color:var(--txt)}
+  .tabs button.on{background:var(--buy);color:#05140d}
+  .btns button.fast{padding:16px 9px;font-size:15px;background:var(--buy);color:#05140d;flex:2}
   .cd{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;font-size:120px;font-weight:900;z-index:9}
 </style>
 </head>
@@ -73,6 +77,10 @@
 <div class="cd" id="cd">3</div>
 
 <div id="panel">
+  <div class="tabs">
+    <button id="tabPending" class="on">⏳ Pending</button>
+    <button id="tabFast">⚡ Rapide</button>
+  </div>
   <div class="sig wait" id="sig">
     <div class="big" id="sigTxt">PRÊT</div>
     <div class="conf" id="sigConf">En attente de démarrage</div>
@@ -111,7 +119,7 @@ async function candidateModels(key){
   PREFERRED.forEach(p=>{ if(!list.includes(p)) list.push(p); });
   return list;
 }
-let stream=null, video=null, timer=null, tick=null, busy=false, voiceOn=true, pipWin=null, nextAt=0;
+let stream=null, video=null, timer=null, tick=null, busy=false, voiceOn=true, pipWin=null, nextAt=0, mode="pending";
 
 $("key").value = (()=>{try{return localStorage.getItem("po_groq_key")||""}catch(e){return ""}})();
 $("key").addEventListener("change",()=>{try{localStorage.setItem("po_groq_key",$("key").value.trim())}catch(e){}});
@@ -120,7 +128,7 @@ $("key").addEventListener("change",()=>{try{localStorage.setItem("po_groq_key",$
 $("slot").appendChild($("panel"));
 
 function speak(t){
-  if(!voiceOn||!("speechSynthesis" in window)) return;
+  if(!voiceOn||mode!=="rapide"||!("speechSynthesis" in window)) return;
   speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(t);
   u.lang="fr-FR"; u.rate=1.05;
@@ -164,7 +172,7 @@ $("btnStart").onclick = async ()=>{
 
   speak("Scanner activé");
   setStatus("Scan actif");
-  scan();
+  if(mode==="pending") scan();
   schedule();
 };
 
@@ -180,15 +188,36 @@ function schedule(){
   computeNext();
   tick=setInterval(()=>{
     const left=Math.max(0,Math.round((nextAt-Date.now())/1000));
-    $("next").textContent="Prochain scan : "+left+"s";
-    $("barI").style.width=(100-Math.min(100,left/60*100))+"%";
-    if(Date.now()>=nextAt){ computeNext(); scan(); }
+    if(mode==="pending"){
+      $("next").textContent="Prochain scan : "+left+"s";
+      $("barI").style.width=(100-Math.min(100,left/60*100))+"%";
+    }else{
+      $("next").textContent="Clique ⚡ pour scanner";
+      $("barI").style.width="0";
+    }
+    if(Date.now()>=nextAt){ computeNext(); if(mode==="pending") scan(); }
   },1000);
 }
 
 $("btnNow").onclick=()=>{ if(stream) scan(); };
 $("btnMute").onclick=()=>{ voiceOn=!voiceOn; $("btnMute").textContent=voiceOn?"🔊 Voix":"🔇 Muet"; if(!voiceOn) speechSynthesis.cancel(); };
 $("btnStop").onclick=stop;
+
+function setMode(mm){
+  mode=mm;
+  $("tabPending").classList.toggle("on",mm==="pending");
+  $("tabFast").classList.toggle("on",mm==="rapide");
+  $("btnMute").style.display=mm==="rapide"?"":"none";
+  $("btnNow").className=mm==="rapide"?"fast":"sec";
+  $("btnNow").textContent=mm==="rapide"?"⚡ SCAN RAPIDE":"⚡ Scanner";
+  if("speechSynthesis" in window) speechSynthesis.cancel();
+  render({signal:"PRÊT",conf:null,why:mm==="rapide"
+    ?"Mode rapide : clique ⚡ pour un signal immédiat, avec la voix."
+    :"Mode pending : scan automatique chaque minute, sans voix. Tu reçois la barre de prix, la direction et la durée."},"wait");
+}
+$("tabPending").onclick=()=>setMode("pending");
+$("tabFast").onclick=()=>setMode("rapide");
+setMode("pending");
 
 function stop(){
   clearInterval(tick);
@@ -198,9 +227,9 @@ function stop(){
 }
 
 // ---- Capture + analyse ----
-function grab(){
+function grab(maxW){
   const w=video.videoWidth, h=video.videoHeight;
-  const scale=Math.min(1,1400/w);
+  const scale=Math.min(1,(maxW||1400)/w);
   const c=document.createElement("canvas");
   c.width=Math.round(w*scale); c.height=Math.round(h*scale);
   c.getContext("2d").drawImage(video,0,0,c.width,c.height);
@@ -218,11 +247,20 @@ Donne un plan de trade complet :
 Réponds UNIQUEMENT avec un JSON, sans autre texte :
 {"signal":"ACHETER|VENDRE","prix_entree":"1.08342","duree_min":3,"confiance":0-100,"raison":"1 phrase courte en français (ex : rebond sur support + RSI survendu)"}`;
 
+const PROMPT_FAST = `Tu es un analyste technique expert en trading très court terme.
+L'image est une capture de Pocket Option. L'utilisateur veut entrer MAINTENANT dans un trade rapide, au prix actuel.
+Regarde les dernières bougies, le momentum immédiat, la position par rapport aux supports/résistances proches et aux indicateurs visibles.
+Tu DOIS choisir ACHETER ou VENDRE, jamais d'attente : si c'est flou, choisis le côté le plus probable avec une confiance basse.
+Choisis aussi "duree_sec" parmi 5, 15, 30 ou 60 (secondes).
+Réponds UNIQUEMENT avec un JSON, sans autre texte :
+{"signal":"ACHETER|VENDRE","duree_sec":15,"confiance":0-100,"raison":"5 à 8 mots en français"}`;
+
 async function scan(){
   if(busy||!stream) return;
   busy=true; setStatus("Analyse…");
   try{
-    const img=grab();
+    const m=mode;
+    const img=grab(m==="rapide"?900:1400);
     const key=$("key").value.trim();
     const call=model=>fetch("https://api.groq.com/openai/v1/chat/completions",{
       method:"POST",
@@ -230,7 +268,7 @@ async function scan(){
       body:JSON.stringify({
         model, temperature:0.2, max_tokens:1500,
         messages:[{role:"user",content:[
-          {type:"text",text:PROMPT},
+          {type:"text",text:m==="rapide"?PROMPT_FAST:PROMPT},
           {type:"image_url",image_url:{url:img}}
         ]}]
       })
@@ -241,7 +279,8 @@ async function scan(){
       r=await call(m);
       if(r.ok){ goodModel=m; break; }
       lastErr=m+" → "+r.status+" "+(await r.text()).slice(0,100);
-      if(r.status===401||r.status===429) break;
+      if(r.status===401) throw new Error("Clé Groq invalide (401). Vérifie ta clé.");
+      if(r.status===429) throw new Error("Limite Groq atteinte (429). Attends un peu puis réessaie.");
       r=null;
     }
     if(!r){ goodModel=null; throw new Error("Aucun modèle vision disponible. "+lastErr); }
@@ -255,11 +294,18 @@ async function scan(){
     const s=/VEND/.test(raw)?"VENDRE":"ACHETER";
     const conf=Math.max(0,Math.min(100,parseInt(j.confiance)||0));
     const cls=s==="ACHETER"?"buy":"sell";
-    const prix=String(j.prix_entree||"?").trim();
-    const dur=[1,2,3,5].includes(parseInt(j.duree_min))?parseInt(j.duree_min):1;
-    render({signal:s,conf,why:"📍 Placer à la barre : "+prix+"\n⏱ Durée : "+dur+" min\n"+(j.raison||"")},cls);
-    speak((s==="ACHETER"?"Acheter":"Vendre")+" à "+prix.replace(/[.,]/g," virgule ")+", "+dur+(dur>1?" minutes":" minute")+". Confiance "+conf+" pour cent");
-    addHist(s,conf,cls,prix+" · "+dur+"m");
+    if(m==="rapide"){
+      const ds=[5,15,30,60].includes(parseInt(j.duree_sec))?parseInt(j.duree_sec):15;
+      const lbl=ds===60?"1 min":ds+" s";
+      render({signal:s,conf,why:"⏱ Durée : "+lbl+"\n"+(j.raison||"")},cls);
+      speak(s==="ACHETER"?"Acheter":"Vendre");
+      addHist(s,conf,cls,"rapide "+lbl);
+    }else{
+      const prix=String(j.prix_entree||"?").trim();
+      const dur=[1,2,3,5].includes(parseInt(j.duree_min))?parseInt(j.duree_min):1;
+      render({signal:s,conf,why:"📍 Placer à la barre : "+prix+"\n⏱ Durée : "+dur+" min\n"+(j.raison||"")},cls);
+      addHist(s,conf,cls,prix+" · "+dur+"m");
+    }
     setStatus("Scan actif");
   }catch(e){
     render({signal:"ERREUR",conf:null,why:e.message},"wait");
