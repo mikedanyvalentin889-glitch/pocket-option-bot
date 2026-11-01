@@ -137,12 +137,43 @@ $("key").addEventListener("change",()=>{try{localStorage.setItem("po_groq_key",$
 // place le panneau dans la page au départ
 $("slot").appendChild($("panel"));
 
+// Audio : bips (fiables en arrière-plan) + voix française
+let actx=null;
+function initAudio(){
+  try{ speechSynthesis.getVoices(); }catch(e){}
+  if(actx) { actx.resume(); return; }
+  try{
+    actx=new (window.AudioContext||window.webkitAudioContext)();
+    // son quasi inaudible en boucle : empêche le navigateur d'endormir l'onglet en arrière-plan
+    const o=actx.createOscillator(), g=actx.createGain();
+    g.gain.value=0.001; o.frequency.value=40; o.connect(g); g.connect(actx.destination); o.start();
+  }catch(e){}
+}
+function beep(sig){
+  if(!actx||!voiceOn||mode!=="rapide") return;
+  actx.resume();
+  const t=actx.currentTime, f=sig==="ACHETER"?[660,990]:[990,520];
+  f.forEach((fr,i)=>{
+    const o=actx.createOscillator(), g=actx.createGain(), s=t+i*0.18;
+    o.type="sine"; o.frequency.value=fr;
+    g.gain.setValueAtTime(0.0001,s);
+    g.gain.exponentialRampToValueAtTime(0.4,s+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,s+0.17);
+    o.connect(g); g.connect(actx.destination); o.start(s); o.stop(s+0.18);
+  });
+}
 function speak(t){
-  if(!voiceOn||mode!=="rapide"||!("speechSynthesis" in window)) return;
-  speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(t);
-  u.lang="fr-FR"; u.rate=1.05;
-  speechSynthesis.speak(u);
+  if(!voiceOn||mode!=="rapide") return;
+  const w=pipWin||window, ss=w.speechSynthesis;
+  if(!ss) return;
+  try{ ss.cancel(); ss.resume(); }catch(e){}
+  setTimeout(()=>{
+    const u=new w.SpeechSynthesisUtterance(t);
+    u.lang="fr-FR"; u.rate=1.05; u.volume=1;
+    const v=ss.getVoices().find(v=>/^fr/i.test(v.lang));
+    if(v) u.voice=v;
+    ss.speak(u);
+  },60);
 }
 
 function setStatus(t){ $("status").textContent=t; }
@@ -165,6 +196,7 @@ $("btnPip").onclick = async ()=>{
 
 // ---- Démarrage ----
 $("btnStart").onclick = async ()=>{
+  initAudio();
   const key=$("key").value.trim();
   if(!key){ alert("Colle ta clé Groq d'abord."); return; }
   try{localStorage.setItem("po_groq_key",key)}catch(e){}
@@ -210,7 +242,11 @@ function schedule(){
 }
 
 $("btnNow").onclick=()=>{ if(stream) scan(); };
-$("btnMute").onclick=()=>{ voiceOn=!voiceOn; $("btnMute").textContent=voiceOn?"🔊 Voix":"🔇 Muet"; if(!voiceOn) speechSynthesis.cancel(); };
+$("btnMute").onclick=()=>{
+  voiceOn=!voiceOn; $("btnMute").textContent=voiceOn?"🔊 Voix":"🔇 Muet";
+  if(!voiceOn){ try{(pipWin||window).speechSynthesis.cancel();}catch(e){} }
+  else { initAudio(); beep("ACHETER"); setTimeout(()=>speak("Voix activée"),400); }
+};
 $("btnStop").onclick=stop;
 
 function setMode(mm){
@@ -279,7 +315,7 @@ async function scan(){
       method:"POST",
       headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
       body:JSON.stringify({
-        model, temperature:0.2, max_tokens:1500,
+        model, temperature:0.2, max_tokens:(m==="rapide"?700:1000),
         messages:[{role:"user",content:[
           {type:"text",text:(m==="rapide"?PROMPT_FAST:PROMPT)+memoryText()},
           {type:"image_url",image_url:{url:img}}
@@ -287,16 +323,19 @@ async function scan(){
       })
     });
     let r=null, lastErr="";
-    const tryList = goodModel ? [goodModel] : await candidateModels(key);
+    if(!window.candCache) window.candCache=await candidateModels(key);
+    const tryList = goodModel ? [goodModel,...window.candCache.filter(x=>x!==goodModel)] : window.candCache;
     for(const m of tryList){
       r=await call(m);
       if(r.ok){ goodModel=m; break; }
-      lastErr=m+" → "+r.status+" "+(await r.text()).slice(0,100);
+      lastErr=m+" → "+r.status+" "+(await r.text()).slice(0,260);
       if(r.status===401) throw new Error("Clé Groq invalide (401). Vérifie ta clé.");
-      if(r.status===429) throw new Error("Limite Groq atteinte (429). Attends un peu puis réessaie.");
-      r=null;
+      r=null; // 429 ou modèle indisponible : on essaie le modèle suivant (les limites sont par modèle)
     }
-    if(!r){ goodModel=null; throw new Error("Aucun modèle vision disponible. "+lastErr); }
+    if(!r){
+      window.candCache=null;
+      throw new Error((lastErr.includes("→ 429")?"Limite Groq (429) sur tous les modèles. ":"Aucun modèle vision disponible. ")+lastErr);
+    }
     const data=await r.json();
     let txt=(data.choices?.[0]?.message?.content||"").replace(/<think>[\s\S]*?<\/think>/g,"");
     const all=txt.match(/\{[^{}]*\}/g);
@@ -311,7 +350,8 @@ async function scan(){
       const ds=[5,15,30,60].includes(parseInt(j.duree_sec))?parseInt(j.duree_sec):15;
       const lbl=ds===60?"1 min":ds+" s";
       render({signal:s,conf,why:"⏱ Durée : "+lbl+"\n"+(j.raison||"")},cls);
-      speak(s==="ACHETER"?"Acheter":"Vendre");
+      beep(s);
+      setTimeout(()=>speak(s==="ACHETER"?"Acheter":"Vendre"),400);
       addHist(logEntry({mode:"rapide",signal:s,conf,prix:null,dur:lbl,raison:j.raison||""}),cls,"rapide "+lbl);
     }else{
       const prix=String(j.prix_entree||"?").trim();
