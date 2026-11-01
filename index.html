@@ -38,6 +38,9 @@
   .hist{margin-top:10px;font-size:12px;max-height:130px;overflow:auto}
   .hist div{display:flex;justify-content:space-between;padding:4px 2px;border-top:1px solid var(--line);color:var(--mut)}
   .hist b.buy{color:var(--buy)} .hist b.sell{color:var(--sell)} .hist b.wait{color:var(--wait)}
+  .hist{font-size:11px !important}
+  .hist div{align-items:center;gap:6px}
+  .hist .rs button{padding:0 3px;background:transparent;font-size:14px;border:0;color:inherit}
   .tabs{display:flex;gap:6px;margin-bottom:10px}
   .tabs button{flex:1;padding:9px;font-size:12px;background:#222a3a;color:var(--txt)}
   .tabs button.on{background:var(--buy);color:#05140d}
@@ -55,6 +58,7 @@
     <input type="password" id="key" placeholder="gsk_...">
     <label style="margin-top:10px">Modèle vision (laisse vide = détection automatique)</label>
     <input type="text" id="model" placeholder="ex : qwen/qwen3.8-27b">
+    <button class="sec" id="btnReset" style="margin-top:10px;width:100%">🗑 Effacer la mémoire d'apprentissage</button>
   </div>
 
   <div class="box">
@@ -88,6 +92,8 @@
   <div class="why" id="why">—</div>
   <div class="meta"><span id="status">Arrêté</span><span id="next">--s</span></div>
   <div class="bar"><i id="barI"></i></div>
+  <div id="stats" style="font-size:11px;color:var(--mut);margin:0 2px 4px"></div>
+  <div id="learn" style="font-size:12px;margin:0 2px 8px;line-height:1.4;min-height:16px"></div>
   <div class="btns">
     <button class="sec" id="btnNow">⚡ Scanner</button>
     <button class="sec" id="btnMute">🔊 Voix</button>
@@ -120,6 +126,10 @@ async function candidateModels(key){
   return list;
 }
 let stream=null, video=null, timer=null, tick=null, busy=false, voiceOn=true, pipWin=null, nextAt=0, mode="pending";
+let curThumb=null; const thumbs={};
+function loadJ(k,def){try{return JSON.parse(localStorage.getItem(k))||def}catch(e){return def}}
+function saveJ(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+let journal=loadJ("po_journal",[]), lessons=loadJ("po_lessons",[]);
 
 $("key").value = (()=>{try{return localStorage.getItem("po_groq_key")||""}catch(e){return ""}})();
 $("key").addEventListener("change",()=>{try{localStorage.setItem("po_groq_key",$("key").value.trim())}catch(e){}});
@@ -218,6 +228,8 @@ function setMode(mm){
 $("tabPending").onclick=()=>setMode("pending");
 $("tabFast").onclick=()=>setMode("rapide");
 setMode("pending");
+updateStats();
+$("btnReset").onclick=()=>{ if(confirm("Effacer toute la mémoire d'apprentissage (résultats et leçons) ?")){ journal=[]; lessons=[]; saveJ("po_journal",journal); saveJ("po_lessons",lessons); updateStats(); $("learn").textContent=""; } };
 
 function stop(){
   clearInterval(tick);
@@ -261,6 +273,7 @@ async function scan(){
   try{
     const m=mode;
     const img=grab(m==="rapide"?900:1400);
+    curThumb=grab(480);
     const key=$("key").value.trim();
     const call=model=>fetch("https://api.groq.com/openai/v1/chat/completions",{
       method:"POST",
@@ -268,7 +281,7 @@ async function scan(){
       body:JSON.stringify({
         model, temperature:0.2, max_tokens:1500,
         messages:[{role:"user",content:[
-          {type:"text",text:m==="rapide"?PROMPT_FAST:PROMPT},
+          {type:"text",text:(m==="rapide"?PROMPT_FAST:PROMPT)+memoryText()},
           {type:"image_url",image_url:{url:img}}
         ]}]
       })
@@ -299,12 +312,12 @@ async function scan(){
       const lbl=ds===60?"1 min":ds+" s";
       render({signal:s,conf,why:"⏱ Durée : "+lbl+"\n"+(j.raison||"")},cls);
       speak(s==="ACHETER"?"Acheter":"Vendre");
-      addHist(s,conf,cls,"rapide "+lbl);
+      addHist(logEntry({mode:"rapide",signal:s,conf,prix:null,dur:lbl,raison:j.raison||""}),cls,"rapide "+lbl);
     }else{
       const prix=String(j.prix_entree||"?").trim();
       const dur=[1,2,3,5].includes(parseInt(j.duree_min))?parseInt(j.duree_min):1;
       render({signal:s,conf,why:"📍 Placer à la barre : "+prix+"\n⏱ Durée : "+dur+" min\n"+(j.raison||"")},cls);
-      addHist(s,conf,cls,prix+" · "+dur+"m");
+      addHist(logEntry({mode:"pending",signal:s,conf,prix,dur:dur+"m",raison:j.raison||""}),cls,prix+" · "+dur+"m");
     }
     setStatus("Scan actif");
   }catch(e){
@@ -319,10 +332,77 @@ function render(o,cls){
   $("sigConf").textContent=o.conf!=null?("Confiance : "+o.conf+"%"):"";
   $("why").textContent=o.why||"";
 }
-function addHist(s,conf,cls,extra){
-  const t=new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+// ---- Apprentissage : journal, résultats, leçons ----
+function logEntry(o){
+  const e=Object.assign({id:Date.now(),t:Date.now(),res:null},o);
+  journal.push(e); if(journal.length>60) journal.shift();
+  saveJ("po_journal",journal);
+  if(curThumb){ thumbs[e.id]=curThumb; Object.keys(thumbs).slice(0,-10).forEach(k=>delete thumbs[k]); }
+  return e;
+}
+
+function updateStats(){
+  const done=journal.filter(x=>x.res);
+  const w=done.filter(x=>x.res==="win").length;
+  const pct=done.length?Math.round(w/done.length*100):0;
+  $("stats").textContent="🧠 "+done.length+" trades notés · "+pct+"% gagnés · "+lessons.length+" leçon"+(lessons.length>1?"s":"");
+}
+
+function memoryText(){
+  const done=journal.filter(x=>x.res);
+  if(!done.length&&!lessons.length) return "";
+  const w=done.filter(x=>x.res==="win").length;
+  const by=s=>{const a=done.filter(x=>x.signal===s);return a.filter(x=>x.res==="win").length+"/"+a.length;};
+  const recent=done.slice(-8).map(x=>"- "+x.signal+" ("+x.conf+"%) → "+(x.res==="win"?"GAGNÉ":"PERDU")+" : "+x.raison).join("\n");
+  return "\n\nTA MÉMOIRE (résultats réels de tes signaux passés, tiens-en compte) :\n"
+    +"- Bilan : "+w+" gagnés sur "+done.length+".\n"
+    +"- ACHETER gagnés : "+by("ACHETER")+" ; VENDRE gagnés : "+by("VENDRE")+".\n"
+    +(lessons.length?"- Leçons apprises de tes erreurs (applique-les) :\n"+lessons.map((l,i)=>"  "+(i+1)+". "+l).join("\n")+"\n":"")
+    +(recent?"- Derniers résultats :\n"+recent+"\n":"")
+    +"Adapte ton analyse : si un type de signal ou une raison a souvent perdu, sois plus exigeant ou change de côté ; si une approche a gagné, répète-la.";
+}
+
+function markResult(e,r,row){
+  if(e.res) return;
+  e.res=r; saveJ("po_journal",journal);
+  row.querySelector(".rs").textContent=r==="win"?"✅":"❌";
+  updateStats();
+  if(r==="loss") reflect(e);
+  else $("learn").textContent="🧠 Noté : cette approche a marché, je m'en souviendrai.";
+}
+
+async function reflect(e){
+  const model=goodModel; if(!model){ $("learn").textContent="🧠 Erreur notée."; return; }
+  $("learn").textContent="🧠 J'analyse mon erreur…";
+  try{
+    const content=[{type:"text",text:"Tu avais donné ce signal de trading : "+e.signal+" (confiance "+e.conf+"%, "
+      +(e.mode==="rapide"?"trade rapide de "+e.dur:"pending à "+e.prix+" pour "+e.dur)+"), raison : \""+(e.raison||"")+"\". Le trade a PERDU. "
+      +(thumbs[e.id]?"L'image est le graphique au moment du signal. ":"")
+      +"Analyse l'erreur comme un trader humain qui se corrige : quelle est la cause probable ? Formule UNE règle courte, concrète et réutilisable pour ne pas la répéter. Réponds UNIQUEMENT en JSON : {\"lecon\":\"règle en une phrase, en français\"}"}];
+    if(thumbs[e.id]) content.push({type:"image_url",image_url:{url:thumbs[e.id]}});
+    const r=await fetch("https://api.groq.com/openai/v1/chat/completions",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+$("key").value.trim()},
+      body:JSON.stringify({model,temperature:0.3,max_tokens:1200,messages:[{role:"user",content}]})
+    });
+    if(!r.ok) throw new Error("API "+r.status);
+    const data=await r.json();
+    const txt=(data.choices?.[0]?.message?.content||"").replace(/<think>[\s\S]*?<\/think>/g,"");
+    const all=txt.match(/\{[^{}]*\}/g);
+    const l=String(JSON.parse(all?all[all.length-1]:txt).lecon||"").trim();
+    if(!l) throw new Error("vide");
+    if(!lessons.includes(l)) lessons.push(l);
+    lessons=lessons.slice(-10); saveJ("po_lessons",lessons); updateStats();
+    $("learn").textContent="🧠 Leçon apprise : "+l;
+  }catch(err){ $("learn").textContent="🧠 Erreur notée (analyse impossible : "+err.message+")."; }
+}
+
+function addHist(e,cls,extra){
+  const t=new Date(e.t).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+  const s=e.signal, conf=e.conf;
   const d=document.createElement("div");
-  d.innerHTML=`<span>${t}</span><b class="${cls}">${s}</b><span>${extra||""} · ${conf}%</span>`;
+  d.innerHTML=`<span>${t}</span><b class="${cls}">${s}</b><span>${extra||""} · ${conf}%</span><span class="rs"><button data-r="win">✅</button><button data-r="loss">❌</button></span>`;
+  d.querySelectorAll("button").forEach(b=>b.onclick=()=>markResult(e,b.dataset.r,d));
   $("hist").prepend(d);
   while($("hist").children.length>15) $("hist").lastChild.remove();
 }
