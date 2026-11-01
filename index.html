@@ -113,25 +113,27 @@
 
 <script>
 const $ = id => document.getElementById(id);
-const PREFERRED = ["qwen/qwen3.8-27b","qwen/qwen3.6-27b","meta-llama/llama-4-scout-17b-16e-instruct","meta-llama/llama-4-maverick-17b-128e-instruct"];
+const PREFERRED = ["qwen/qwen3.8-27b","qwen/qwen3.6-27b"];
 let goodModel = null;
 $("model").value = (()=>{try{return localStorage.getItem("po_model")||""}catch(e){return ""}})();
 $("model").addEventListener("change",()=>{goodModel=null;try{localStorage.setItem("po_model",$("model").value.trim())}catch(e){}});
 
 async function candidateModels(key){
-  const list=[];
+  const list=[]; let fetched=false;
   const manual=$("model").value.trim();
   if(manual) list.push(manual);
   try{
     const r=await fetch("https://api.groq.com/openai/v1/models",{headers:{Authorization:"Bearer "+key}});
     if(r.ok){
       const ids=(await r.json()).data.map(m=>m.id);
+      fetched=true; window.availIds=ids;
       PREFERRED.forEach(p=>{ if(ids.includes(p)&&!list.includes(p)) list.push(p); });
       ids.filter(i=>/vision|qwen|llama-4|maverick|scout|pixtral|gemma-3/i.test(i)&&!/whisper|guard|tts|orpheus/i.test(i))
          .forEach(i=>{ if(!list.includes(i)) list.push(i); });
     }
   }catch(e){}
-  PREFERRED.forEach(p=>{ if(!list.includes(p)) list.push(p); });
+  if(!fetched) PREFERRED.forEach(p=>{ if(!list.includes(p)) list.push(p); });
+  else if(!list.includes(PREFERRED[0])) list.unshift(PREFERRED[0]);
   return list;
 }
 let stream=null, video=null, timer=null, tick=null, busy=false, voiceOn=true, pipWin=null, nextAt=0, mode="pending";
@@ -350,16 +352,22 @@ async function scan(){
       let body="";
       if(!r.ok){
         body=await r.text();
-        if(r.status===400 && /reasoning/i.test(body)){ r=await call(m,true); body=r.ok?"":await r.text(); }
+        if(r.status===400){ r=await call(m,true); body=r.ok?"":await r.text(); }
       }
       if(r.ok){ goodModel=m; break; }
-      lastErr=m+" → "+r.status+" "+body.slice(0,260);
+      let msg=body; try{ msg=JSON.parse(body).error.message; }catch(e){}
+      lastErr=m+" → "+r.status+" "+msg.slice(0,200);
+      (window.errs=window.errs||[]).push(lastErr);
       if(r.status===401) throw new Error("Clé Groq invalide (401). Vérifie ta clé.");
       r=null; // 429 ou modèle indisponible : on essaie le modèle suivant (les limites sont par modèle)
     }
     if(!r){
       window.candCache=null;
-      throw new Error((lastErr.includes("→ 429")?"Limite Groq (429) sur tous les modèles. ":"Aucun modèle vision disponible. ")+lastErr);
+      const all=(window.errs||[]).slice(-4).join(" | "); window.errs=[];
+      const hint=/404|403|permission|access/i.test(all)
+        ? " → Active le modèle qwen/qwen3.8-27b dans console.groq.com (Settings > Model Permissions / Limits)."
+        : "";
+      throw new Error((all.includes("→ 429")?"Limite Groq (429). ":"Modèle vision indisponible. ")+all+hint);
     }
     const data=await r.json();
     let txt=(data.choices?.[0]?.message?.content||"").replace(/<think>[\s\S]*?<\/think>/g,"");
