@@ -49,6 +49,8 @@
   <div class="box">
     <label>Clé Groq (gardée seulement dans ton navigateur)</label>
     <input type="password" id="key" placeholder="gsk_...">
+    <label style="margin-top:10px">Modèle vision (laisse vide = détection automatique)</label>
+    <input type="text" id="model" placeholder="ex : qwen/qwen3.8-27b">
   </div>
 
   <div class="box">
@@ -88,7 +90,27 @@
 
 <script>
 const $ = id => document.getElementById(id);
-const MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+const PREFERRED = ["qwen/qwen3.8-27b","qwen/qwen3.6-27b","meta-llama/llama-4-scout-17b-16e-instruct","meta-llama/llama-4-maverick-17b-128e-instruct"];
+let goodModel = null;
+$("model").value = (()=>{try{return localStorage.getItem("po_model")||""}catch(e){return ""}})();
+$("model").addEventListener("change",()=>{goodModel=null;try{localStorage.setItem("po_model",$("model").value.trim())}catch(e){}});
+
+async function candidateModels(key){
+  const list=[];
+  const manual=$("model").value.trim();
+  if(manual) list.push(manual);
+  try{
+    const r=await fetch("https://api.groq.com/openai/v1/models",{headers:{Authorization:"Bearer "+key}});
+    if(r.ok){
+      const ids=(await r.json()).data.map(m=>m.id);
+      PREFERRED.forEach(p=>{ if(ids.includes(p)&&!list.includes(p)) list.push(p); });
+      ids.filter(i=>/vision|qwen|llama-4|maverick|scout|pixtral|gemma-3/i.test(i)&&!/whisper|guard|tts|orpheus/i.test(i))
+         .forEach(i=>{ if(!list.includes(i)) list.push(i); });
+    }
+  }catch(e){}
+  PREFERRED.forEach(p=>{ if(!list.includes(p)) list.push(p); });
+  return list;
+}
 let stream=null, video=null, timer=null, tick=null, busy=false, voiceOn=true, pipWin=null, nextAt=0;
 
 $("key").value = (()=>{try{return localStorage.getItem("po_groq_key")||""}catch(e){return ""}})();
@@ -199,22 +221,33 @@ async function scan(){
   busy=true; setStatus("Analyse…");
   try{
     const img=grab();
-    const r=await fetch("https://api.groq.com/openai/v1/chat/completions",{
+    const key=$("key").value.trim();
+    const call=model=>fetch("https://api.groq.com/openai/v1/chat/completions",{
       method:"POST",
-      headers:{"Content-Type":"application/json","Authorization":"Bearer "+$("key").value.trim()},
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
       body:JSON.stringify({
-        model:MODEL, temperature:0.2, max_tokens:200,
+        model, temperature:0.2, max_tokens:1500,
         messages:[{role:"user",content:[
           {type:"text",text:PROMPT},
           {type:"image_url",image_url:{url:img}}
         ]}]
       })
     });
-    if(!r.ok){ throw new Error("API "+r.status+" "+(await r.text()).slice(0,120)); }
+    let r=null, lastErr="";
+    const tryList = goodModel ? [goodModel] : await candidateModels(key);
+    for(const m of tryList){
+      r=await call(m);
+      if(r.ok){ goodModel=m; break; }
+      lastErr=m+" → "+r.status+" "+(await r.text()).slice(0,100);
+      if(r.status===401||r.status===429) break;
+      r=null;
+    }
+    if(!r){ goodModel=null; throw new Error("Aucun modèle vision disponible. "+lastErr); }
     const data=await r.json();
-    const txt=data.choices?.[0]?.message?.content||"";
-    const m=txt.match(/\{[\s\S]*\}/);
-    const j=JSON.parse(m?m[0]:txt);
+    let txt=(data.choices?.[0]?.message?.content||"").replace(/<think>[\s\S]*?<\/think>/g,"");
+    const all=txt.match(/\{[^{}]*\}/g);
+    const j=JSON.parse(all?all[all.length-1]:txt);
+    setStatus("Scan actif · "+goodModel.split("/").pop());
     let s=String(j.signal||"ATTENDRE").toUpperCase();
     const conf=Math.max(0,Math.min(100,parseInt(j.confiance)||0));
     if(!["ACHETER","VENDRE","ATTENDRE"].includes(s)) s="ATTENDRE";
