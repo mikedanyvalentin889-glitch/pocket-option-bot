@@ -89,6 +89,11 @@
     <div class="big" id="sigTxt">PRÊT</div>
     <div class="conf" id="sigConf">En attente de démarrage</div>
   </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin:8px 2px">
+    <div><span id="scoreNum" style="font-size:30px;font-weight:800">--</span><span style="color:var(--mut);font-size:13px">/100</span></div>
+    <div style="text-align:center"><div style="font-size:10px;color:var(--mut)">QUALITÉ</div><div id="qualTxt" style="font-weight:700;font-size:13px">--</div></div>
+    <div id="bars" style="display:flex;gap:3px;align-items:flex-end;height:26px;min-width:50px"></div>
+  </div>
   <div class="why" id="why">—</div>
   <div class="meta"><span id="status">Arrêté</span><span id="next">--s</span></div>
   <div class="bar"><i id="barI"></i></div>
@@ -114,6 +119,15 @@
     <canvas id="roiCv" style="width:100%;border-radius:8px;touch-action:none;cursor:crosshair"></canvas>
     <div class="btns" style="margin-top:8px"><button id="roiOk">✔ OK</button><button class="sec" id="roiCancel">Annuler</button></div>
   </div>
+  <details style="margin:6px 2px 8px">
+    <summary style="font-size:12px;color:var(--mut);cursor:pointer">🧮 Calculateur de risque</summary>
+    <div style="display:flex;gap:6px;margin:6px 0">
+      <label style="flex:1">Solde $<input id="rcBal" type="number" style="width:100%;padding:6px;border-radius:6px;border:1px solid #222a3a;background:#0e121b;color:#e8ecf4"></label>
+      <label style="flex:1">Risque %<input id="rcPct" type="number" style="width:100%;padding:6px;border-radius:6px;border:1px solid #222a3a;background:#0e121b;color:#e8ecf4"></label>
+      <label style="flex:1">Gain %<input id="rcPay" type="number" style="width:100%;padding:6px;border-radius:6px;border:1px solid #222a3a;background:#0e121b;color:#e8ecf4"></label>
+    </div>
+    <div id="rcOut" style="font-size:12px;line-height:1.5"></div>
+  </details>
   <div id="stats" style="font-size:11px;color:var(--mut);margin:0 2px 4px"></div>
   <div id="learn" style="font-size:12px;margin:0 2px 8px;line-height:1.4;min-height:16px"></div>
   <div class="btns">
@@ -154,6 +168,7 @@ let curThumb=null; const thumbs={};
 function loadJ(k,def){try{return JSON.parse(localStorage.getItem(k))||def}catch(e){return def}}
 function saveJ(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 let journal=loadJ("po_journal",[]), lessons=loadJ("po_lessons",[]);
+let lastScore=null; const scoreHist=[];
 
 $("key").value = (()=>{try{return localStorage.getItem("po_groq_key")||""}catch(e){return ""}})();
 $("key").addEventListener("change",()=>{try{localStorage.setItem("po_groq_key",$("key").value.trim())}catch(e){}});
@@ -298,6 +313,8 @@ $("tabPending").onclick=()=>setMode("pending");
 $("tabFast").onclick=()=>setMode("rapide");
 setMode("pending");
 $("every").onchange=()=>{ if(stream) schedule(); };
+loadRC();
+["rcBal","rcPct","rcPay"].forEach(id=>{ $(id).oninput=calcRisk; });
 updateStats();
 $("btnReset").onclick=()=>{ if(confirm("Effacer toute la mémoire d'apprentissage (résultats et leçons) ?")){ journal=[]; lessons=[]; saveJ("po_journal",journal); saveJ("po_lessons",lessons); updateStats(); $("learn").textContent=""; } };
 
@@ -337,6 +354,31 @@ Choisis aussi "duree_sec" parmi 5, 15, 30 ou 60 (secondes).
 Réponds UNIQUEMENT avec un JSON, sans autre texte :
 {"signal":"ACHETER|VENDRE","duree_sec":15,"confiance":0-100,"raison":"5 à 8 mots en français"}`;
 
+// ---- Score /100, qualité, calculateur de risque ----
+function loadRC(){
+  const v=loadJ("po_rc",{bal:1000,pct:2,pay:85});
+  $("rcBal").value=v.bal; $("rcPct").value=v.pct; $("rcPay").value=v.pay;
+  calcRisk();
+}
+function calcRisk(){
+  const bal=parseFloat($("rcBal").value)||0, pct=parseFloat($("rcPct").value)||0, pay=parseFloat($("rcPay").value)||0;
+  saveJ("po_rc",{bal,pct,pay});
+  let stake=bal*pct/100, note="";
+  if(lastScore!==null&&lastScore<35){ stake/=2; note=" (signal faible → mise réduite de moitié)"; }
+  $("rcOut").innerHTML="Mise suggérée : <b>$"+stake.toFixed(2)+"</b>"+note
+    +"<br>Si gagné : +$"+(stake*pay/100).toFixed(2)+" · Si perdu : −$"+stake.toFixed(2)
+    +"<br><span style=\"color:var(--wait)\">Ne double jamais la mise après une perte et ne mets pas plusieurs trades sur le même signal.</span>";
+}
+function showScore(s,sig){
+  lastScore=s;
+  $("scoreNum").textContent=s;
+  const q=s<35?["FAIBLE","var(--sell)"]:s<65?["MOYEN","var(--wait)"]:["FORT","var(--buy)"];
+  $("qualTxt").textContent=q[0]; $("qualTxt").style.color=q[1];
+  scoreHist.push({s,sig}); if(scoreHist.length>6) scoreHist.shift();
+  $("bars").innerHTML=scoreHist.map(x=>'<i style="display:block;width:6px;height:'+Math.max(4,Math.round(x.s/100*26))+'px;background:'+(x.sig==="ACHETER"?"var(--buy)":"var(--sell)")+';border-radius:2px"></i>').join("");
+  calcRisk();
+}
+
 // ================= MOTEUR LOCAL (0 token) =================
 let roi=loadJ("po_roi",{x:0.03,y:0.12,w:0.70,h:0.72});
 
@@ -372,7 +414,7 @@ function analyzeLocal(){
       h*=60;
       const c=col[x];
       if(h>=75&&h<=185){ c.gc++; if(y<c.gt)c.gt=y; if(y>c.gb)c.gb=y; }
-      else if(h<=14||h>=340){ c.rc++; if(y<c.rt)c.rt=y; if(y>c.rb)c.rb=y; }
+      else if(h<=22||h>=340){ c.rc++; if(y<c.rt)c.rt=y; if(y>c.rb)c.rb=y; }
     }
   }
   // regroupe les colonnes voisines de même couleur = une bougie
@@ -386,7 +428,7 @@ function analyzeLocal(){
   if(cur) groups.push(cur);
   const cs=[];
   groups.forEach(gp=>{
-    if(gp.cols.length>25) return;
+    if(gp.cols.length>60) return;
     const get=x=>gp.k==="g"?[col[x].gt,col[x].gb]:[col[x].rt,col[x].rb];
     let top=1e9,bot=-1;
     gp.cols.forEach(x=>{const [t,b]=get(x); if(t<top)top=t; if(b>bot)bot=b;});
@@ -429,7 +471,7 @@ function analyzeLocal(){
   const swingLow=Math.min(...win.map(c=>-c.bot)), swingHigh=Math.max(...win.map(c=>-c.top));
   const levelPrice = sig==="ACHETER" ? Math.max(swingLow,lastClose-1.5*atr) : Math.min(swingHigh,lastClose+1.5*atr);
   const dist=Math.abs(lastClose-levelPrice)/atr;
-  return {sig,conf,strat,reason,cv,W,H,levelY:-levelPrice,lastY:-lastClose,dist};
+  return {sig,conf,strat,reason,cv,W,H,levelY:-levelPrice,lastY:-lastClose,dist,score100:Math.round(Math.min(1,Math.abs(score)/1.3)*100)};
 }
 
 function drawMini(a){
@@ -450,6 +492,7 @@ function scanLocal(){
   busy=true; const m=mode;
   try{
     const a=analyzeLocal(), cls=a.sig==="ACHETER"?"buy":"sell";
+    showScore(a.score100,a.sig);
     if(m==="rapide"){
       $("mini").style.display="none";
       const ds=a.strat==="trend"?30:15, lbl=ds+" s";
@@ -550,6 +593,7 @@ async function scan(){
     const s=/VEND/.test(raw)?"VENDRE":"ACHETER";
     const conf=Math.max(0,Math.min(100,parseInt(j.confiance)||0));
     const cls=s==="ACHETER"?"buy":"sell";
+    showScore(conf,s);
     if(m==="rapide"){
       const ds=[5,15,30,60].includes(parseInt(j.duree_sec))?parseInt(j.duree_sec):15;
       const lbl=ds===60?"1 min":ds+" s";
