@@ -1,711 +1,138 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Scanner Pocket Option</title>
-<style id="css">
-  :root{--bg:#0b0d12;--card:#141823;--line:#222a3a;--txt:#e8ecf4;--mut:#8791a7;--buy:#19d68a;--sell:#ff4d5e;--wait:#f5b942}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
-  .home{max-width:560px;margin:0 auto;padding:20px}
-  h1{font-size:20px;margin:0 0 4px}
-  .sub{color:var(--mut);font-size:13px;margin-bottom:16px}
-  .box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
-  label{font-size:12px;color:var(--mut);display:block;margin-bottom:6px}
-  input[type=password],input[type=text]{width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:#0e121b;color:var(--txt)}
-  button{cursor:pointer;border:0;border-radius:10px;padding:12px 14px;font-weight:700;font-size:14px;color:#05140d;background:var(--buy)}
-  button.sec{background:#222a3a;color:var(--txt)}
-  button.stop{background:var(--sell);color:#fff}
-  .row{display:flex;gap:8px;flex-wrap:wrap}
-  .row button{flex:1}
-  ol{color:var(--mut);font-size:13px;padding-left:18px;line-height:1.6}
-  .warn{font-size:12px;color:var(--mut);border-left:3px solid var(--wait);padding-left:10px}
-
-  #panel{position:relative;background:var(--bg);color:var(--txt);padding:12px;min-height:100%;font-family:system-ui,Segoe UI,Roboto,sans-serif}
-  .sig{border-radius:14px;padding:18px 10px;text-align:center;background:var(--card);border:2px solid var(--line);transition:.2s}
-  .sig .big{font-size:34px;font-weight:900;letter-spacing:1px}
-  .sig .conf{font-size:13px;color:var(--mut);margin-top:4px}
-  .sig.buy{border-color:var(--buy);background:rgba(25,214,138,.12)} .sig.buy .big{color:var(--buy)}
-  .sig.sell{border-color:var(--sell);background:rgba(255,77,94,.12)} .sig.sell .big{color:var(--sell)}
-  .sig.wait{border-color:var(--wait);background:rgba(245,185,66,.1)} .sig.wait .big{color:var(--wait)}
-  .why{font-size:14px;margin:10px 2px;line-height:1.5;min-height:60px;white-space:pre-line}
-  .meta{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin:8px 2px}
-  .bar{height:6px;border-radius:4px;background:var(--line);overflow:hidden;margin:6px 0 10px}
-  .bar i{display:block;height:100%;width:0;background:var(--buy);transition:width .9s linear}
-  .btns{display:flex;gap:6px}
-  .btns button{flex:1;padding:9px;font-size:12px}
-  .hist{margin-top:10px;font-size:12px;max-height:130px;overflow:auto}
-  .hist div{display:flex;justify-content:space-between;padding:4px 2px;border-top:1px solid var(--line);color:var(--mut)}
-  .hist b.buy{color:var(--buy)} .hist b.sell{color:var(--sell)} .hist b.wait{color:var(--wait)}
-  .hist{font-size:11px !important}
-  .hist div{align-items:center;gap:6px}
-  .hist .rs button{padding:0 3px;background:transparent;font-size:14px;border:0;color:inherit}
-  .tabs{display:flex;gap:6px;margin-bottom:10px}
-  .tabs button{flex:1;padding:9px;font-size:12px;background:#222a3a;color:var(--txt)}
-  .tabs button.on{background:var(--buy);color:#05140d}
-  .btns button.fast{padding:16px 9px;font-size:15px;background:var(--buy);color:#05140d;flex:2}
-  .cd{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;font-size:120px;font-weight:900;z-index:9}
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scan 1 min</title>
+<style>
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --ink:#18263a; --mute:#66758a; --line:#d9dfe6;
+  --buy:#0c8f7d; --buy-bg:#dcf3ef; --sell:#c93d36; --sell-bg:#fbe3e1; --wait:#8a6d1c; --wait-bg:#f4ecd3;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#121a26; --panel:#1a2536; --ink:#e7edf5; --mute:#8d9cb2; --line:#2b3a50;
+  --buy:#3fd1b9; --buy-bg:#123b36; --sell:#ff7a72; --sell-bg:#471f1f; --wait:#e3c25f; --wait-bg:#3d3418;}
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:20px 16px 48px}
+.wrap{max-width:860px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px}
+h1{font-size:28px;margin:0;letter-spacing:-.02em}
+.status{color:var(--mute);font-size:14px;font-variant-numeric:tabular-nums}
+.bar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-bottom:16px}
+.bar i{display:block;height:100%;width:0;background:var(--ink);transition:width 1s linear}
+.row{display:grid;grid-template-columns:110px 1fr 120px;gap:14px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px;border-left-width:6px}
+.row.buy{border-left-color:var(--buy)} .row.sell{border-left-color:var(--sell)} .row.wait{border-left-color:var(--line)}
+.pair b{display:block;font-size:18px}
+.pair span{color:var(--mute);font-size:13px;font-variant-numeric:tabular-nums}
+.meta{font-size:13px;color:var(--mute);display:flex;flex-wrap:wrap;gap:4px 14px;font-variant-numeric:tabular-nums}
+.meta em{font-style:normal;color:var(--ink)}
+.sig{justify-self:end;text-align:center;min-width:110px;padding:8px 10px;border-radius:8px;font-weight:700;font-size:17px}
+.sig small{display:block;font-weight:500;font-size:12px;opacity:.85}
+.buy .sig{background:var(--buy-bg);color:var(--buy)} .sell .sig{background:var(--sell-bg);color:var(--sell)} .wait .sig{background:var(--wait-bg);color:var(--wait)}
+h2{font-size:18px;margin:28px 0 10px}
+.log{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 16px;font-size:14px;font-variant-numeric:tabular-nums}
+.log div{padding:8px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px}
+.log div:last-child{border-bottom:0}
+.log .b{color:var(--buy);font-weight:600} .log .s{color:var(--sell);font-weight:600}
+.empty{color:var(--mute);padding:10px 0}
+.note{color:var(--mute);font-size:13px;margin-top:22px}
+.err{color:var(--sell);font-size:14px;margin-bottom:10px}
+button{font:inherit;background:var(--ink);color:var(--bg);border:0;border-radius:8px;padding:8px 14px;cursor:pointer}
+button:focus-visible{outline:3px solid var(--buy);outline-offset:2px}
+@media (max-width:560px){.row{grid-template-columns:1fr auto}.meta{grid-column:1/-1}.sig{grid-row:1;grid-column:2}}
 </style>
 </head>
 <body>
-<div class="home" id="home">
-  <h1>📡 Scanner Pocket Option</h1>
-  <div class="sub">Analyse ton écran toutes les minutes et te dit ACHETER / VENDRE / ATTENDRE, à voix haute.</div>
-
-  <div class="box">
-    <label>Clé Groq (gardée seulement dans ton navigateur)</label>
-    <input type="password" id="key" placeholder="gsk_...">
-    <label style="margin-top:10px">Modèle vision (laisse vide = détection automatique)</label>
-    <input type="text" id="model" placeholder="ex : qwen/qwen3.8-27b">
-    <button class="sec" id="btnReset" style="margin-top:10px;width:100%">🗑 Effacer la mémoire d'apprentissage</button>
-  </div>
-
-  <div class="box">
-    <ol>
-      <li>Ouvre Pocket Option dans un autre onglet (ou une autre fenêtre).</li>
-      <li>Clique <b>Panneau latéral</b> : une petite fenêtre reste au-dessus de ton écran.</li>
-      <li>Clique <b>DÉMARRER</b> → choisis la fenêtre/onglet Pocket Option → compte à rebours de 3 secondes.</li>
-    </ol>
-    <div class="row">
-      <button class="sec" id="btnPip">🪟 Panneau latéral</button>
-      <button id="btnStart">▶ DÉMARRER (3 s)</button>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Scan 1 minute</h1>
+      <div class="status" id="status">Chargement…</div>
     </div>
-  </div>
-
-  <div id="slot"></div>
-
-  <div class="warn">Le scanner donne une analyse automatique, pas une garantie. Les options binaires de 1 minute sont très risquées : ne mise que ce que tu peux perdre.</div>
-</div>
-
-<div class="cd" id="cd">3</div>
-
-<div id="panel">
-  <div class="tabs">
-    <button id="tabPending" class="on">⏳ Pending</button>
-    <button id="tabFast">⚡ Rapide</button>
-  </div>
-  <div class="sig wait" id="sig">
-    <div class="big" id="sigTxt">PRÊT</div>
-    <div class="conf" id="sigConf">En attente de démarrage</div>
-  </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;margin:8px 2px">
-    <div><span id="scoreNum" style="font-size:30px;font-weight:800">--</span><span style="color:var(--mut);font-size:13px">/100</span></div>
-    <div style="text-align:center"><div style="font-size:10px;color:var(--mut)">QUALITÉ</div><div id="qualTxt" style="font-weight:700;font-size:13px">--</div></div>
-    <div id="bars" style="display:flex;gap:3px;align-items:flex-end;height:26px;min-width:50px"></div>
-  </div>
-  <div class="why" id="why">—</div>
-  <div class="meta"><span id="status">Arrêté</span><span id="next">--s</span></div>
-  <div class="bar"><i id="barI"></i></div>
-  <div style="font-size:11px;color:var(--mut);margin:0 2px 6px">Scan auto (Pending) :
-    <select id="every" style="background:#0e121b;color:#e8ecf4;border:1px solid #222a3a;border-radius:6px;padding:3px">
-      <option value="1">chaque 1 min</option>
-      <option value="2" selected>chaque 2 min</option>
-      <option value="3">chaque 3 min</option>
-      <option value="5">chaque 5 min</option>
-      <option value="0">manuel (0 token)</option>
-    </select>
-  </div>
-  <div style="font-size:11px;color:var(--mut);margin:0 2px 6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">Moteur :
-    <select id="engine" style="background:#0e121b;color:#e8ecf4;border:1px solid #222a3a;border-radius:6px;padding:3px">
-      <option value="local" selected>Local (0 token)</option>
-      <option value="ia">IA Groq</option>
-    </select>
-    <button class="sec" id="btnRoi" style="padding:4px 8px;font-size:11px">🎯 Zone du graphique</button>
-  </div>
-  <canvas id="mini" width="296" height="130" style="display:none;width:100%;border-radius:8px;margin:0 0 8px"></canvas>
-  <div id="roiBox" style="display:none;position:absolute;inset:0;background:#0b0d12;z-index:5;padding:10px">
-    <div style="font-size:12px;margin-bottom:6px">Trace un rectangle autour des bougies (sans les boutons ni l'axe des prix).</div>
-    <canvas id="roiCv" style="width:100%;border-radius:8px;touch-action:none;cursor:crosshair"></canvas>
-    <div class="btns" style="margin-top:8px"><button id="roiOk">✔ OK</button><button class="sec" id="roiCancel">Annuler</button></div>
-  </div>
-  <details style="margin:6px 2px 8px">
-    <summary style="font-size:12px;color:var(--mut);cursor:pointer">🧮 Calculateur de risque</summary>
-    <div style="display:flex;gap:6px;margin:6px 0">
-      <label style="flex:1">Solde $<input id="rcBal" type="number" style="width:100%;padding:6px;border-radius:6px;border:1px solid #222a3a;background:#0e121b;color:#e8ecf4"></label>
-      <label style="flex:1">Risque %<input id="rcPct" type="number" style="width:100%;padding:6px;border-radius:6px;border:1px solid #222a3a;background:#0e121b;color:#e8ecf4"></label>
-      <label style="flex:1">Gain %<input id="rcPay" type="number" style="width:100%;padding:6px;border-radius:6px;border:1px solid #222a3a;background:#0e121b;color:#e8ecf4"></label>
-    </div>
-    <div id="rcOut" style="font-size:12px;line-height:1.5"></div>
-  </details>
-  <div id="stats" style="font-size:11px;color:var(--mut);margin:0 2px 4px"></div>
-  <div id="learn" style="font-size:12px;margin:0 2px 8px;line-height:1.4;min-height:16px"></div>
-  <div class="btns">
-    <button class="sec" id="btnNow">⚡ Scanner</button>
-    <button class="sec" id="btnMute">🔊 Voix</button>
-    <button class="stop" id="btnStop">■ Stop</button>
-  </div>
-  <div class="hist" id="hist"></div>
+    <button id="refresh">Scanner maintenant</button>
+  </header>
+  <div class="bar"><i id="prog"></i></div>
+  <div class="err" id="err" hidden></div>
+  <div id="rows"></div>
+  <h2>Historique des signaux</h2>
+  <div class="log" id="log"><div class="empty">Aucun signal pour l’instant.</div></div>
+  <p class="note">Bougies 1 min Binance. Signal = score de 4 indicateurs (EMA 9/21, RSI 14, MACD, Bandes de Bollinger). Le scan tourne tant que cette page reste ouverte. Ce sont des indicateurs techniques, pas une garantie de résultat.</p>
 </div>
 
 <script>
-const $ = id => document.getElementById(id) || (pipWin && pipWin.document.getElementById(id));
-const PREFERRED = ["qwen/qwen3.8-27b","qwen/qwen3.6-27b"];
-let goodModel = null;
-$("model").value = (()=>{try{return localStorage.getItem("po_model")||""}catch(e){return ""}})();
-$("model").addEventListener("change",()=>{goodModel=null;try{localStorage.setItem("po_model",$("model").value.trim())}catch(e){}});
+const PAIRS = ["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT","DOGEUSDT","ADAUSDT","EURUSDT"];
+const SCAN_EVERY = 60; // secondes
+const API = "https://api.binance.com/api/v3/klines?interval=1m&limit=120&symbol=";
+let countdown = SCAN_EVERY, scanning = false, lastSig = {}, history = [];
 
-async function candidateModels(key){
-  const list=[]; let fetched=false;
-  const manual=$("model").value.trim();
-  if(manual) list.push(manual);
-  try{
-    const r=await fetch("https://api.groq.com/openai/v1/models",{headers:{Authorization:"Bearer "+key}});
-    if(r.ok){
-      const ids=(await r.json()).data.map(m=>m.id);
-      fetched=true; window.availIds=ids;
-      PREFERRED.forEach(p=>{ if(ids.includes(p)&&!list.includes(p)) list.push(p); });
-      ids.filter(i=>/vision|qwen|llama-4|maverick|scout|pixtral|gemma-3/i.test(i)&&!/whisper|guard|tts|orpheus/i.test(i))
-         .forEach(i=>{ if(!list.includes(i)) list.push(i); });
-    }
-  }catch(e){}
-  if(!fetched) PREFERRED.forEach(p=>{ if(!list.includes(p)) list.push(p); });
-  else if(!list.includes(PREFERRED[0])) list.unshift(PREFERRED[0]);
-  return list;
+const ema = (a,p)=>{const k=2/(p+1),r=[a[0]];for(let i=1;i<a.length;i++)r.push(a[i]*k+r[i-1]*(1-k));return r};
+function rsi(c,p=14){
+  let g=0,l=0;
+  for(let i=1;i<=p;i++){const d=c[i]-c[i-1];d>=0?g+=d:l-=d}
+  g/=p;l/=p;
+  for(let i=p+1;i<c.length;i++){const d=c[i]-c[i-1];g=(g*(p-1)+Math.max(d,0))/p;l=(l*(p-1)+Math.max(-d,0))/p}
+  return l===0?100:100-100/(1+g/l);
 }
-let stream=null, video=null, timer=null, tick=null, busy=false, voiceOn=true, pipWin=null, nextAt=0, mode="pending";
-let curThumb=null; const thumbs={};
-function loadJ(k,def){try{return JSON.parse(localStorage.getItem(k))||def}catch(e){return def}}
-function saveJ(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
-let journal=loadJ("po_journal",[]), lessons=loadJ("po_lessons",[]);
-let lastScore=null; const scoreHist=[];
-
-$("key").value = (()=>{try{return localStorage.getItem("po_groq_key")||""}catch(e){return ""}})();
-$("key").addEventListener("change",()=>{try{localStorage.setItem("po_groq_key",$("key").value.trim())}catch(e){}});
-
-// place le panneau dans la page au départ
-$("slot").appendChild($("panel"));
-
-// Audio : bips (fiables en arrière-plan) + voix française
-let actx=null;
-function initAudio(){
-  try{ speechSynthesis.getVoices(); }catch(e){}
-  if(actx) { actx.resume(); return; }
-  try{
-    actx=new (window.AudioContext||window.webkitAudioContext)();
-    // son quasi inaudible en boucle : empêche le navigateur d'endormir l'onglet en arrière-plan
-    const o=actx.createOscillator(), g=actx.createGain();
-    g.gain.value=0.001; o.frequency.value=40; o.connect(g); g.connect(actx.destination); o.start();
-  }catch(e){}
+function analyse(c){
+  const last=c[c.length-1];
+  const e9=ema(c,9),e21=ema(c,21);
+  const m12=ema(c,12),m26=ema(c,26),macd=m12.map((v,i)=>v-m26[i]),sg=ema(macd,9);
+  const h=macd.map((v,i)=>v-sg[i]), h0=h[h.length-1], h1=h[h.length-2];
+  const w=c.slice(-20),mean=w.reduce((a,b)=>a+b,0)/20,sd=Math.sqrt(w.reduce((a,b)=>a+(b-mean)**2,0)/20);
+  const up=mean+2*sd,lo=mean-2*sd;
+  const r=rsi(c);
+  let score=0;
+  score+= e9[e9.length-1]>e21[e21.length-1]?1:-1;
+  score+= r<30?1:r>70?-1:0;
+  score+= (h0>0&&h0>h1)?1:(h0<0&&h0<h1)?-1:0;
+  score+= last<lo?1:last>up?-1:0;
+  return {last,score,rsi:r,hist:h0,trend:e9[e9.length-1]>e21[e21.length-1]?"haussier":"baissier"};
 }
-function beep(sig){
-  if(!actx||!voiceOn||mode!=="rapide") return;
-  actx.resume();
-  const t=actx.currentTime, f=sig==="ACHETER"?[660,990]:[990,520];
-  f.forEach((fr,i)=>{
-    const o=actx.createOscillator(), g=actx.createGain(), s=t+i*0.18;
-    o.type="sine"; o.frequency.value=fr;
-    g.gain.setValueAtTime(0.0001,s);
-    g.gain.exponentialRampToValueAtTime(0.4,s+0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001,s+0.17);
-    o.connect(g); g.connect(actx.destination); o.start(s); o.stop(s+0.18);
-  });
+const label=s=>s>=3?["ACHAT","fort"]:s>=2?["ACHAT","modéré"]:s<=-3?["VENTE","fort"]:s<=-2?["VENTE","modéré"]:["ATTENTE","pas de signal"];
+const fmt=n=>n>=100?n.toFixed(2):n>=1?n.toFixed(4):n.toFixed(6);
+const nm=p=>p.replace("USDT","/USDT");
+
+async function scanOne(sym){
+  const res=await fetch(API+sym);
+  if(!res.ok) throw new Error(sym+" "+res.status);
+  const k=await res.json();
+  return {sym,...analyse(k.slice(0,-1).concat([k[k.length-1]]).map(x=>+x[4]))};
 }
-function speak(t){
-  if(!voiceOn||mode!=="rapide") return;
-  const w=pipWin||window, ss=w.speechSynthesis;
-  if(!ss) return;
-  try{ ss.cancel(); ss.resume(); }catch(e){}
-  setTimeout(()=>{
-    const u=new w.SpeechSynthesisUtterance(t);
-    u.lang="fr-FR"; u.rate=1.05; u.volume=1;
-    const v=ss.getVoices().find(v=>/^fr/i.test(v.lang));
-    if(v) u.voice=v;
-    ss.speak(u);
-  },60);
-}
-
-function setStatus(t){ $("status").textContent=t; }
-
-// ---- Panneau latéral flottant (Picture-in-Picture document) ----
-$("btnPip").onclick = async ()=>{
-  if(!("documentPictureInPicture" in window)){
-    alert("Ton navigateur ne gère pas le panneau flottant. Utilise Chrome ou Edge récent, ou ouvre cette page dans une petite fenêtre placée à côté de Pocket Option.");
-    return;
-  }
-  try{
-    pipWin = await documentPictureInPicture.requestWindow({width:320,height:620});
-    pipWin.document.head.appendChild($("css").cloneNode(true));
-    pipWin.document.body.style.margin="0";
-    pipWin.document.body.style.background="#0b0d12";
-    pipWin.document.body.appendChild($("panel"));
-    pipWin.addEventListener("pagehide",()=>{ $("slot").appendChild($("panel")); pipWin=null; });
-  }catch(e){ alert("Impossible d'ouvrir le panneau : "+e.message); }
-};
-
-// ---- Démarrage ----
-$("btnStart").onclick = async ()=>{
-  initAudio();
-  const key=$("key").value.trim();
-  if(!key && $("engine").value==="ia"){ alert("Colle ta clé Groq d'abord (ou choisis le moteur Local, sans clé)."); return; }
-  try{localStorage.setItem("po_groq_key",key)}catch(e){}
-  try{
-    stream = await navigator.mediaDevices.getDisplayMedia({video:{frameRate:5},audio:false});
-  }catch(e){ setStatus("Partage refusé"); return; }
-  video=document.createElement("video");
-  video.srcObject=stream; video.muted=true; await video.play();
-  stream.getVideoTracks()[0].addEventListener("ended",stop);
-
-  // compte à rebours 3 secondes pour revenir sur Pocket Option
-  const cd=$("cd"); cd.style.display="flex";
-  for(let i=3;i>=1;i--){ cd.textContent=i; await new Promise(r=>setTimeout(r,1000)); }
-  cd.style.display="none";
-
-  speak("Scanner activé");
-  setStatus("Scan actif");
-  if(mode==="pending") scan();
-  schedule();
-};
-
-// Scan automatique à la seconde 50 de chaque minute (signal prêt avant la prochaine bougie)
-function schedule(){
-  clearInterval(tick);
-  const computeNext=()=>{
-    const N=parseInt($("every").value)||0;
-    if(!N){ nextAt=Infinity; return; }
-    const d=new Date(); const n=new Date(d);
-    n.setSeconds(50,0);
-    if(n<=d) n.setMinutes(n.getMinutes()+1);
-    while(((Math.floor(n.getTime()/60000)+1)%N)!==0) n.setMinutes(n.getMinutes()+1);
-    nextAt=n.getTime();
-  };
-  computeNext();
-  tick=setInterval(()=>{
-    const left=Math.max(0,Math.round((nextAt-Date.now())/1000));
-    if(mode==="pending"){
-      if(!isFinite(nextAt)){
-        $("next").textContent="Manuel · clique ⚡"; $("barI").style.width="0";
-      }else{
-        const N=parseInt($("every").value)||1;
-        $("next").textContent="Prochain scan : "+left+"s";
-        $("barI").style.width=(100-Math.min(100,left/(N*60)*100))+"%";
-      }
-    }else{
-      $("next").textContent="Clique ⚡ pour scanner";
-      $("barI").style.width="0";
-    }
-    if(Date.now()>=nextAt){ computeNext(); if(mode==="pending") scan(); }
-  },1000);
-}
-
-$("btnNow").onclick=()=>{ if(stream) scan(); };
-$("btnMute").onclick=()=>{
-  voiceOn=!voiceOn; $("btnMute").textContent=voiceOn?"🔊 Voix":"🔇 Muet";
-  if(!voiceOn){ try{(pipWin||window).speechSynthesis.cancel();}catch(e){} }
-  else { initAudio(); beep("ACHETER"); setTimeout(()=>speak("Voix activée"),400); }
-};
-$("btnStop").onclick=stop;
-
-function setMode(mm){
-  mode=mm;
-  $("tabPending").classList.toggle("on",mm==="pending");
-  $("tabFast").classList.toggle("on",mm==="rapide");
-  $("btnMute").style.display=mm==="rapide"?"":"none";
-  $("btnNow").className=mm==="rapide"?"fast":"sec";
-  $("btnNow").textContent=mm==="rapide"?"⚡ SCAN RAPIDE":"⚡ Scanner";
-  if("speechSynthesis" in window) speechSynthesis.cancel();
-  if($("mini")) $("mini").style.display="none";
-  render({signal:"PRÊT",conf:null,why:mm==="rapide"
-    ?"Mode rapide : clique ⚡ pour un signal immédiat, avec la voix."
-    :"Mode pending : scan automatique chaque minute, sans voix. Tu reçois la barre de prix, la direction et la durée."},"wait");
-}
-$("tabPending").onclick=()=>setMode("pending");
-$("tabFast").onclick=()=>setMode("rapide");
-setMode("pending");
-$("every").onchange=()=>{ if(stream) schedule(); };
-loadRC();
-["rcBal","rcPct","rcPay"].forEach(id=>{ $(id).oninput=calcRisk; });
-updateStats();
-$("btnReset").onclick=()=>{ if(confirm("Effacer toute la mémoire d'apprentissage (résultats et leçons) ?")){ journal=[]; lessons=[]; saveJ("po_journal",journal); saveJ("po_lessons",lessons); updateStats(); $("learn").textContent=""; } };
-
-function stop(){
-  clearInterval(tick);
-  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
-  setStatus("Arrêté"); $("next").textContent="--s"; $("barI").style.width="0";
-  render({signal:"PRÊT",conf:null,why:"Scanner arrêté."},"wait");
-}
-
-// ---- Capture + analyse ----
-function grab(maxW){
-  const w=video.videoWidth, h=video.videoHeight;
-  const scale=Math.min(1,(maxW||1400)/w);
-  const c=document.createElement("canvas");
-  c.width=Math.round(w*scale); c.height=Math.round(h*scale);
-  c.getContext("2d").drawImage(video,0,0,c.width,c.height);
-  return c.toDataURL("image/jpeg",0.72);
-}
-
-const PROMPT = `Tu es un analyste technique expert en graphiques de trading à court terme.
-L'image est une capture de la plateforme Pocket Option. L'utilisateur va placer un TRADE EN ATTENTE (pending trade) : il choisit un niveau de prix précis où le trade s'ouvrira, une direction et une durée d'expiration.
-Analyse le graphique principal : tendance, momentum, supports et résistances proches, mèches de rejet, zones de retournement, et tout indicateur visible (RSI, moyennes mobiles, Bollinger, MACD).
-Donne un plan de trade complet :
-1. "prix_entree" : le niveau de prix exact (lu sur l'axe des prix à droite, même format et même nombre de décimales) où placer le trade en attente. Choisis un niveau réaliste proche du prix actuel : un support pour ACHETER sur rebond, une résistance pour VENDRE sur rejet, ou une cassure confirmée.
-2. "signal" : la direction à cette barre de prix, ACHETER ou VENDRE. Tu DOIS choisir l'un des deux, jamais d'attente : même si le graphique est difficile, choisis le côté le plus probable et indique une confiance basse.
-3. "duree_min" : la durée d'expiration en minutes, choisie parmi 1, 2, 3 ou 5, adaptée à la vitesse du marché et à la taille des bougies.
-4. "confiance" : de 0 à 100.
-Réponds UNIQUEMENT avec un JSON, sans autre texte :
-{"signal":"ACHETER|VENDRE","prix_entree":"1.08342","duree_min":3,"confiance":0-100,"raison":"1 phrase courte en français (ex : rebond sur support + RSI survendu)"}`;
-
-const PROMPT_FAST = `Tu es un analyste technique expert en trading très court terme.
-L'image est une capture de Pocket Option. L'utilisateur veut entrer MAINTENANT dans un trade rapide, au prix actuel.
-Regarde les dernières bougies, le momentum immédiat, la position par rapport aux supports/résistances proches et aux indicateurs visibles.
-Tu DOIS choisir ACHETER ou VENDRE, jamais d'attente : si c'est flou, choisis le côté le plus probable avec une confiance basse.
-Choisis aussi "duree_sec" parmi 5, 15, 30 ou 60 (secondes).
-Réponds UNIQUEMENT avec un JSON, sans autre texte :
-{"signal":"ACHETER|VENDRE","duree_sec":15,"confiance":0-100,"raison":"5 à 8 mots en français"}`;
-
-// ---- Score /100, qualité, calculateur de risque ----
-function loadRC(){
-  const v=loadJ("po_rc",{bal:1000,pct:2,pay:85});
-  $("rcBal").value=v.bal; $("rcPct").value=v.pct; $("rcPay").value=v.pay;
-  calcRisk();
-}
-function calcRisk(){
-  const bal=parseFloat($("rcBal").value)||0, pct=parseFloat($("rcPct").value)||0, pay=parseFloat($("rcPay").value)||0;
-  saveJ("po_rc",{bal,pct,pay});
-  let stake=bal*pct/100, note="";
-  if(lastScore!==null&&lastScore<35){ stake/=2; note=" (signal faible → mise réduite de moitié)"; }
-  $("rcOut").innerHTML="Mise suggérée : <b>$"+stake.toFixed(2)+"</b>"+note
-    +"<br>Si gagné : +$"+(stake*pay/100).toFixed(2)+" · Si perdu : −$"+stake.toFixed(2)
-    +"<br><span style=\"color:var(--wait)\">Ne double jamais la mise après une perte et ne mets pas plusieurs trades sur le même signal.</span>";
-}
-function showScore(s,sig){
-  lastScore=s;
-  $("scoreNum").textContent=s;
-  const q=s<35?["FAIBLE","var(--sell)"]:s<65?["MOYEN","var(--wait)"]:["FORT","var(--buy)"];
-  $("qualTxt").textContent=q[0]; $("qualTxt").style.color=q[1];
-  scoreHist.push({s,sig}); if(scoreHist.length>6) scoreHist.shift();
-  $("bars").innerHTML=scoreHist.map(x=>'<i style="display:block;width:6px;height:'+Math.max(4,Math.round(x.s/100*26))+'px;background:'+(x.sig==="ACHETER"?"var(--buy)":"var(--sell)")+';border-radius:2px"></i>').join("");
-  calcRisk();
-}
-
-// ================= MOTEUR LOCAL (0 token) =================
-let roi=loadJ("po_roi",{x:0.03,y:0.12,w:0.70,h:0.72});
-
-function stratWeight(s){
-  const n=journal.filter(x=>x.strat===s&&x.res).slice(-12);
-  if(n.length<4) return 1;
-  const wr=n.filter(x=>x.res==="win").length/n.length;
-  return 0.4+1.2*wr;
-}
-function localLearn(e){
-  const w=stratWeight(e.strat);
-  const n=journal.filter(x=>x.strat===e.strat&&x.res).slice(-12);
-  const wins=n.filter(x=>x.res==="win").length;
-  $("learn").textContent="🧠 Stratégie « "+(e.strat==="trend"?"tendance":"retournement")+" » : "+wins+"/"+n.length
-    +" gagnés → poids "+w.toFixed(2)+(w<0.8?" (je m'en méfie davantage)":w>1.15?" (je lui fais plus confiance)":"");
-}
-
-function analyzeLocal(){
-  const vw=video.videoWidth, vh=video.videoHeight;
-  const sx=Math.round(roi.x*vw), sy=Math.round(roi.y*vh), sw=Math.max(50,Math.round(roi.w*vw)), sh=Math.max(50,Math.round(roi.h*vh));
-  const W=Math.min(800,sw), H=Math.round(sh*W/sw);
-  const cv=document.createElement("canvas"); cv.width=W; cv.height=H;
-  const ctx=cv.getContext("2d",{willReadFrequently:true});
-  ctx.drawImage(video,sx,sy,sw,sh,0,0,W,H);
-  const d=ctx.getImageData(0,0,W,H).data;
-  const col=[]; for(let x=0;x<W;x++) col.push({gc:0,gt:1e9,gb:-1,rc:0,rt:1e9,rb:-1});
-  for(let y=0;y<H;y++){
-    for(let x=0;x<W;x++){
-      const i=(y*W+x)*4, r=d[i], g=d[i+1], b=d[i+2];
-      const mx=Math.max(r,g,b), mn=Math.min(r,g,b), dl=mx-mn;
-      if(mx<100||dl<mx*0.45) continue;
-      let h; if(mx===r) h=((g-b)/dl+6)%6; else if(mx===g) h=(b-r)/dl+2; else h=(r-g)/dl+4;
-      h*=60;
-      const c=col[x];
-      if(h>=75&&h<=185){ c.gc++; if(y<c.gt)c.gt=y; if(y>c.gb)c.gb=y; }
-      else if(h<=22||h>=340){ c.rc++; if(y<c.rt)c.rt=y; if(y>c.rb)c.rb=y; }
-    }
-  }
-  // regroupe les colonnes voisines de même couleur = une bougie
-  const groups=[]; let cur=null;
-  for(let x=0;x<W;x++){
-    const c=col[x]; let k=null;
-    if(c.gc>=2&&c.gc>=c.rc) k="g"; else if(c.rc>=2) k="r";
-    if(k&&cur&&cur.k===k){ cur.cols.push(x); }
-    else { if(cur) groups.push(cur); cur=k?{k,cols:[x]}:null; }
-  }
-  if(cur) groups.push(cur);
-  const cs=[];
-  groups.forEach(gp=>{
-    if(gp.cols.length>60) return;
-    const get=x=>gp.k==="g"?[col[x].gt,col[x].gb]:[col[x].rt,col[x].rb];
-    let top=1e9,bot=-1;
-    gp.cols.forEach(x=>{const [t,b]=get(x); if(t<top)top=t; if(b>bot)bot=b;});
-    let bt=top, bb=bot;
-    if(gp.cols.length>=3){ const [t1,b1]=get(gp.cols[0]), [t2,b2]=get(gp.cols[gp.cols.length-1]); bt=Math.min(t1,t2); bb=Math.max(b1,b2); }
-    if(bot<0||bot-top>H*0.95) return;
-    cs.push({k:gp.k,top,bot,close:gp.k==="g"?-bt:-bb,open:gp.k==="g"?-bb:-bt});
-  });
-  if(cs.length<16) throw new Error("Seulement "+cs.length+" bougies détectées. Clique 🎯 Zone du graphique et encadre uniquement les bougies.");
-  const last40=cs.slice(-40), closes=last40.map(c=>c.close), last=last40[last40.length-1];
-
-  const mean=a=>a.reduce((s,v)=>s+v,0)/a.length;
-  const ema=(a,n)=>{const k=2/(n+1);let e=a[0];for(let i=1;i<a.length;i++)e=a[i]*k+e*(1-k);return e;};
-  const atr=Math.max(1,mean(last40.slice(-10).map(c=>c.bot-c.top)));
-  const t=(ema(closes,5)-ema(closes,13))/atr;
-  let gain=0,loss=0;
-  for(let i=closes.length-14;i<closes.length;i++){ const df=closes[i]-closes[i-1]; if(df>0)gain+=df; else loss-=df; }
-  const rsi=loss===0?100:100-100/(1+gain/loss);
-  const w20=closes.slice(-20), mu=mean(w20), sd=Math.sqrt(mean(w20.map(v=>(v-mu)*(v-mu))));
-  const z=sd<1e-6?0:(closes[closes.length-1]-mu)/sd;
-  let streak=0; for(let i=last40.length-1;i>=0&&last40[i].k===last.k;i--) streak++;
-
-  const sT=Math.sign(t)*Math.min(1,Math.abs(t)/1.2);
-  let sR=0;
-  if(Math.abs(z)>1) sR+=-Math.sign(z)*Math.min(1,Math.abs(z)-1);
-  if(rsi>68) sR-=Math.min(1,(rsi-68)/20);
-  if(rsi<32) sR+=Math.min(1,(32-rsi)/20);
-  if(streak>=4) sR+=(last.k==="g"?-1:1)*0.25;
-  const wT=stratWeight("trend"), wR=stratWeight("revert");
-  let score = Math.abs(sR)>0.5 ? sR*wR*1.2+sT*wT*0.3 : sT*wT+sR*wR*0.5;
-  if(Math.abs(score)<0.02) score=last.k==="g"?0.02:-0.02;
-  const sig=score>0?"ACHETER":"VENDRE";
-  const strat=Math.abs(sR*wR)>Math.abs(sT*wT)?"revert":"trend";
-  const conf=Math.round(Math.max(50,Math.min(88,50+Math.abs(score)*30)));
-  const reason = strat==="revert"
-    ? "Retournement probable : "+(rsi>=50?"surachat":"survente")+" (RSI "+Math.round(rsi)+")"+(streak>=4?", "+streak+" bougies de suite":"")
-    : "Tendance "+(t>0?"haussière":"baissière")+" (EMA5 "+(t>0?">":"<")+" EMA13), RSI "+Math.round(rsi);
-
-  const lastClose=closes[closes.length-1], win=last40.slice(-12);
-  const swingLow=Math.min(...win.map(c=>-c.bot)), swingHigh=Math.max(...win.map(c=>-c.top));
-  const levelPrice = sig==="ACHETER" ? Math.max(swingLow,lastClose-1.5*atr) : Math.min(swingHigh,lastClose+1.5*atr);
-  const dist=Math.abs(lastClose-levelPrice)/atr;
-  return {sig,conf,strat,reason,cv,W,H,levelY:-levelPrice,lastY:-lastClose,dist,score100:Math.round(Math.min(1,Math.abs(score)/1.3)*100)};
-}
-
-function drawMini(a){
-  const mc=$("mini"), W=296, H=Math.round(a.H*W/a.W);
-  mc.width=W; mc.height=H; mc.style.display="block";
-  const x=mc.getContext("2d"), k=W/a.W;
-  x.drawImage(a.cv,0,0,W,H);
-  x.lineWidth=1; x.strokeStyle="#f5b942"; x.setLineDash([3,3]);
-  x.beginPath(); x.moveTo(0,a.lastY*k); x.lineTo(W,a.lastY*k); x.stroke();
-  x.lineWidth=2; x.strokeStyle="#4da3ff"; x.setLineDash([8,4]);
-  x.beginPath(); x.moveTo(0,a.levelY*k); x.lineTo(W,a.levelY*k); x.stroke();
-  x.setLineDash([]); x.fillStyle="#4da3ff"; x.font="bold 11px system-ui";
-  x.fillText("▶ pending ici", 6, Math.max(12,a.levelY*k-4));
-}
-
-function scanLocal(){
-  if(!stream||busy) return;
-  busy=true; const m=mode;
-  try{
-    const a=analyzeLocal(), cls=a.sig==="ACHETER"?"buy":"sell";
-    showScore(a.score100,a.sig);
-    if(m==="rapide"){
-      $("mini").style.display="none";
-      const ds=a.strat==="trend"?30:15, lbl=ds+" s";
-      render({signal:a.sig,conf:a.conf,why:"⏱ Durée : "+lbl+"\n"+a.reason},cls);
-      beep(a.sig);
-      setTimeout(()=>speak(a.sig==="ACHETER"?"Acheter":"Vendre"),400);
-      addHist(logEntry({mode:"rapide",signal:a.sig,conf:a.conf,prix:null,dur:lbl,raison:a.reason,strat:a.strat}),cls,"rapide "+lbl);
-    }else{
-      drawMini(a);
-      const dur=a.strat==="trend"?3:2;
-      render({signal:a.sig,conf:a.conf,why:"📍 Pending sur la ligne bleue (≈ "+a.dist.toFixed(1)+" bougie"+(a.dist>=1.5?"s":"")+" du prix)\n⏱ Durée : "+dur+" min\n"+a.reason},cls);
-      addHist(logEntry({mode:"pending",signal:a.sig,conf:a.conf,prix:"ligne bleue",dur:dur+"m",raison:a.reason,strat:a.strat}),cls,"ligne bleue · "+dur+"m");
-    }
-    setStatus("Scan actif · local");
-  }catch(e){
-    render({signal:"ERREUR",conf:null,why:e.message},"wait"); setStatus("Erreur");
-  }finally{ busy=false; }
-}
-
-$("btnRoi").onclick=()=>{
-  if(!stream){ $("learn").textContent="Démarre d'abord le partage d'écran."; return; }
-  const cv=$("roiCv"), W=296, H=Math.round(W*video.videoHeight/video.videoWidth);
-  cv.width=W; cv.height=H;
-  const ctx=cv.getContext("2d"); ctx.drawImage(video,0,0,W,H);
-  const snap=ctx.getImageData(0,0,W,H);
-  let r={...roi}, drag=null;
-  const draw=()=>{ ctx.putImageData(snap,0,0); ctx.strokeStyle="#19d68a"; ctx.lineWidth=2; ctx.strokeRect(r.x*W,r.y*H,r.w*W,r.h*H); };
-  const pos=e=>{ const b=cv.getBoundingClientRect(); return {x:Math.min(1,Math.max(0,(e.clientX-b.left)/b.width)), y:Math.min(1,Math.max(0,(e.clientY-b.top)/b.height))}; };
-  draw();
-  cv.onpointerdown=e=>{ drag=pos(e); cv.setPointerCapture(e.pointerId); };
-  cv.onpointermove=e=>{ if(!drag) return; const p=pos(e); r={x:Math.min(drag.x,p.x),y:Math.min(drag.y,p.y),w:Math.abs(p.x-drag.x),h:Math.abs(p.y-drag.y)}; draw(); };
-  cv.onpointerup=()=>{ drag=null; };
-  $("roiOk").onclick=()=>{ if(r.w>0.05&&r.h>0.05){ roi=r; saveJ("po_roi",roi); } $("roiBox").style.display="none"; };
-  $("roiCancel").onclick=()=>{ $("roiBox").style.display="none"; };
-  $("roiBox").style.display="block";
-};
-// ===========================================================
-
 async function scan(){
-  if($("engine").value==="local") return scanLocal();
-  if(busy||!stream) return;
-  busy=true; setStatus("Analyse…");
-  try{
-    const m=mode;
-    const img=grab(m==="rapide"?900:1400);
-    curThumb=grab(480);
-    const key=$("key").value.trim();
-    const call=(model,noR)=>fetch("https://api.groq.com/openai/v1/chat/completions",{
-      method:"POST",
-      headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
-      body:JSON.stringify({
-        model, temperature:0.2,
-        max_tokens: noR ? (m==="rapide"?700:1000) : (m==="rapide"?220:350),
-        ...(!noR && /qwen/i.test(model) ? {reasoning_effort:"none"} : {}),
-        messages:[{role:"user",content:[
-          {type:"text",text:(m==="rapide"?PROMPT_FAST:PROMPT)+memoryText()},
-          {type:"image_url",image_url:{url:img}}
-        ]}]
-      })
-    });
-    let r=null, lastErr="";
-    if(!window.candCache) window.candCache=await candidateModels(key);
-    const tryList = goodModel ? [goodModel,...window.candCache.filter(x=>x!==goodModel)] : window.candCache;
-    for(const m of tryList){
-      r=await call(m);
-      let body="";
-      if(!r.ok){
-        body=await r.text();
-        if(r.status===400){ r=await call(m,true); body=r.ok?"":await r.text(); }
-      }
-      if(r.ok){ goodModel=m; break; }
-      let msg=body; try{ msg=JSON.parse(body).error.message; }catch(e){}
-      lastErr=m+" → "+r.status+" "+msg.slice(0,400);
-      (window.errs=window.errs||[]).push(lastErr);
-      if(r.status===401) throw new Error("Clé Groq invalide (401). Vérifie ta clé.");
-      r=null; // 429 ou modèle indisponible : on essaie le modèle suivant (les limites sont par modèle)
-    }
-    if(!r){
-      window.candCache=null;
-      const all=(window.errs||[]).slice(-4).join(" | "); window.errs=[];
-      if(/tokens per day|TPD/i.test(all)){
-        const wait=(all.match(/try again in ([0-9hms.]+)/i)||[])[1];
-        const er=new Error("Quota journalier Groq épuisé (200 000 tokens/jour sur ton plan)."+(wait?" Il se renouvelle dans "+wait+".":"")+" Le scanner passe au moteur local (0 token).");
-        er.tpd=true; throw er;
-      }
-      const hint=/→ 404|→ 403|model_not_found|permission/i.test(all)
-        ? " → Vérifie que qwen/qwen3.8-27b est autorisé dans console.groq.com (Settings > Model Permissions)."
-        : "";
-      throw new Error((all.includes("→ 429")?"Limite Groq (429). ":"Modèle vision indisponible. ")+all+hint);
-    }
-    const data=await r.json();
-    let txt=(data.choices?.[0]?.message?.content||"").replace(/<think>[\s\S]*?<\/think>/g,"");
-    const all=txt.match(/\{[^{}]*\}/g);
-    const j=JSON.parse(all?all[all.length-1]:txt);
-    setStatus("Scan actif · "+goodModel.split("/").pop());
-    const raw=String(j.signal||"").toUpperCase();
-    if(!/ACHET|VEND/.test(raw)) throw new Error("Réponse invalide : "+raw);
-    const s=/VEND/.test(raw)?"VENDRE":"ACHETER";
-    const conf=Math.max(0,Math.min(100,parseInt(j.confiance)||0));
-    const cls=s==="ACHETER"?"buy":"sell";
-    showScore(conf,s);
-    if(m==="rapide"){
-      const ds=[5,15,30,60].includes(parseInt(j.duree_sec))?parseInt(j.duree_sec):15;
-      const lbl=ds===60?"1 min":ds+" s";
-      render({signal:s,conf,why:"⏱ Durée : "+lbl+"\n"+(j.raison||"")},cls);
-      beep(s);
-      setTimeout(()=>speak(s==="ACHETER"?"Acheter":"Vendre"),400);
-      addHist(logEntry({mode:"rapide",signal:s,conf,prix:null,dur:lbl,raison:j.raison||""}),cls,"rapide "+lbl);
-    }else{
-      const prix=String(j.prix_entree||"?").trim();
-      const dur=[1,2,3,5].includes(parseInt(j.duree_min))?parseInt(j.duree_min):1;
-      render({signal:s,conf,why:"📍 Placer à la barre : "+prix+"\n⏱ Durée : "+dur+" min\n"+(j.raison||"")},cls);
-      addHist(logEntry({mode:"pending",signal:s,conf,prix,dur:dur+"m",raison:j.raison||""}),cls,prix+" · "+dur+"m");
-    }
-    setStatus("Scan actif");
-  }catch(e){
-    if(e.tpd){
-      $("engine").value="local";
-      $("learn").textContent="⚠️ "+e.message;
-      setTimeout(scanLocal,100);
-    }else{
-      render({signal:"ERREUR",conf:null,why:e.message},"wait");
-      setStatus("Erreur"); speak("Erreur de scan");
-    }
-  }finally{ busy=false; }
+  if(scanning) return; scanning=true;
+  document.getElementById("status").textContent="Scan en cours…";
+  const out=await Promise.allSettled(PAIRS.map(scanOne));
+  const ok=out.filter(o=>o.status==="fulfilled").map(o=>o.value);
+  const bad=out.filter(o=>o.status==="rejected").length;
+  const err=document.getElementById("err");
+  err.hidden=!bad; err.textContent=bad?bad+" paire(s) non chargée(s). Vérifie ta connexion ou réessaie.":"";
+  const now=new Date().toLocaleTimeString("fr-FR");
+  let active=0;
+  document.getElementById("rows").innerHTML=ok.map(o=>{
+    const [t,sub]=label(o.score),cls=o.score>=2?"buy":o.score<=-2?"sell":"wait";
+    if(cls!=="wait") active++;
+    if(cls!=="wait"&&lastSig[o.sym]!==t){history.unshift({time:now,sym:o.sym,t,sub,price:o.last});}
+    lastSig[o.sym]=cls==="wait"?null:t;
+    return `<div class="row ${cls}">
+      <div class="pair"><b>${nm(o.sym)}</b><span>${fmt(o.last)}</span></div>
+      <div class="meta"><span>Tendance <em>${o.trend}</em></span><span>RSI <em>${o.rsi.toFixed(1)}</em></span><span>MACD <em>${o.hist>0?"+":"−"}</em></span><span>Score <em>${o.score>0?"+":""}${o.score}/4</em></span></div>
+      <div class="sig">${t}<small>${sub}</small></div></div>`;
+  }).join("");
+  history=history.slice(0,30);
+  document.getElementById("log").innerHTML=history.length?history.map(h=>`<div><span>${h.time} · ${nm(h.sym)} @ ${fmt(h.price)}</span><span class="${h.t==="ACHAT"?"b":"s"}">${h.t} (${h.sub})</span></div>`).join(""):'<div class="empty">Aucun signal pour l’instant.</div>';
+  document.title=(active?"("+active+") ":"")+"Scan 1 min";
+  document.getElementById("status").textContent="Dernier scan à "+now+" — "+active+" signal(s) actif(s)";
+  countdown=SCAN_EVERY; scanning=false;
 }
-
-function render(o,cls){
-  const el=$("sig"); el.className="sig "+cls;
-  $("sigTxt").textContent=o.signal;
-  $("sigConf").textContent=o.conf!=null?("Confiance : "+o.conf+"%"):"";
-  $("why").textContent=o.why||"";
-}
-// ---- Apprentissage : journal, résultats, leçons ----
-function logEntry(o){
-  const e=Object.assign({id:Date.now(),t:Date.now(),res:null},o);
-  journal.push(e); if(journal.length>60) journal.shift();
-  saveJ("po_journal",journal);
-  if(curThumb){ thumbs[e.id]=curThumb; Object.keys(thumbs).slice(0,-10).forEach(k=>delete thumbs[k]); }
-  return e;
-}
-
-function updateStats(){
-  const done=journal.filter(x=>x.res);
-  const w=done.filter(x=>x.res==="win").length;
-  const pct=done.length?Math.round(w/done.length*100):0;
-  $("stats").textContent="🧠 "+done.length+" trades notés · "+pct+"% gagnés · "+lessons.length+" leçon"+(lessons.length>1?"s":"");
-}
-
-function memoryText(){
-  const done=journal.filter(x=>x.res);
-  if(!done.length&&!lessons.length) return "";
-  const w=done.filter(x=>x.res==="win").length;
-  const by=s=>{const a=done.filter(x=>x.signal===s);return a.filter(x=>x.res==="win").length+"/"+a.length;};
-  const recent=done.slice(-4).map(x=>"- "+x.signal+" ("+x.conf+"%) → "+(x.res==="win"?"GAGNÉ":"PERDU")+" : "+x.raison).join("\n");
-  return "\n\nTA MÉMOIRE (résultats réels de tes signaux passés, tiens-en compte) :\n"
-    +"- Bilan : "+w+" gagnés sur "+done.length+".\n"
-    +"- ACHETER gagnés : "+by("ACHETER")+" ; VENDRE gagnés : "+by("VENDRE")+".\n"
-    +(lessons.length?"- Leçons apprises de tes erreurs (applique-les) :\n"+lessons.slice(-6).map((l,i)=>"  "+(i+1)+". "+l).join("\n")+"\n":"")
-    +(recent?"- Derniers résultats :\n"+recent+"\n":"")
-    +"Adapte ton analyse : si un type de signal ou une raison a souvent perdu, sois plus exigeant ou change de côté ; si une approche a gagné, répète-la.";
-}
-
-function markResult(e,r,row){
-  if(e.res) return;
-  e.res=r; saveJ("po_journal",journal);
-  row.querySelector(".rs").textContent=r==="win"?"✅":"❌";
-  updateStats();
-  if(r==="loss") reflect(e);
-  else if(e.strat) localLearn(e);
-  else $("learn").textContent="🧠 Noté : cette approche a marché, je m'en souviendrai.";
-}
-
-async function reflect(e){
-  if(e.strat){ localLearn(e); return; }
-  const model=goodModel; if(!model){ $("learn").textContent="🧠 Erreur notée."; return; }
-  $("learn").textContent="🧠 J'analyse mon erreur…";
-  try{
-    const content=[{type:"text",text:"Tu avais donné ce signal de trading : "+e.signal+" (confiance "+e.conf+"%, "
-      +(e.mode==="rapide"?"trade rapide de "+e.dur:"pending à "+e.prix+" pour "+e.dur)+"), raison : \""+(e.raison||"")+"\". Le trade a PERDU. "
-      +(thumbs[e.id]?"L'image est le graphique au moment du signal. ":"")
-      +"Analyse l'erreur comme un trader humain qui se corrige : quelle est la cause probable ? Formule UNE règle courte, concrète et réutilisable pour ne pas la répéter. Réponds UNIQUEMENT en JSON : {\"lecon\":\"règle en une phrase, en français\"}"}];
-    if(thumbs[e.id]) content.push({type:"image_url",image_url:{url:thumbs[e.id]}});
-    const go=noR=>fetch("https://api.groq.com/openai/v1/chat/completions",{
-      method:"POST",
-      headers:{"Content-Type":"application/json","Authorization":"Bearer "+$("key").value.trim()},
-      body:JSON.stringify({model,temperature:0.3,max_tokens:noR?1200:300,
-        ...(!noR&&/qwen/i.test(model)?{reasoning_effort:"none"}:{}),
-        messages:[{role:"user",content}]})
-    });
-    let r=await go(false);
-    if(!r.ok&&r.status===400) r=await go(true);
-    if(!r.ok) throw new Error("API "+r.status);
-    const data=await r.json();
-    const txt=(data.choices?.[0]?.message?.content||"").replace(/<think>[\s\S]*?<\/think>/g,"");
-    const all=txt.match(/\{[^{}]*\}/g);
-    const l=String(JSON.parse(all?all[all.length-1]:txt).lecon||"").trim();
-    if(!l) throw new Error("vide");
-    if(!lessons.includes(l)) lessons.push(l);
-    lessons=lessons.slice(-10); saveJ("po_lessons",lessons); updateStats();
-    $("learn").textContent="🧠 Leçon apprise : "+l;
-  }catch(err){ $("learn").textContent="🧠 Erreur notée (analyse impossible : "+err.message+")."; }
-}
-
-function addHist(e,cls,extra){
-  const t=new Date(e.t).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
-  const s=e.signal, conf=e.conf;
-  const d=document.createElement("div");
-  d.innerHTML=`<span>${t}</span><b class="${cls}">${s}</b><span>${extra||""} · ${conf}%</span><span class="rs"><button data-r="win">✅</button><button data-r="loss">❌</button></span>`;
-  d.querySelectorAll("button").forEach(b=>b.onclick=()=>markResult(e,b.dataset.r,d));
-  $("hist").prepend(d);
-  while($("hist").children.length>15) $("hist").lastChild.remove();
-}
+setInterval(()=>{
+  countdown=Math.max(0,countdown-1);
+  document.getElementById("prog").style.width=((SCAN_EVERY-countdown)/SCAN_EVERY*100)+"%";
+  if(countdown===0) scan();
+},1000);
+document.getElementById("refresh").onclick=scan;
+scan();
 </script>
 </body>
 </html>
