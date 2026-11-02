@@ -78,7 +78,7 @@
       <input id="key" type="password" placeholder="gsk_..." autocomplete="off">
     </label>
     <label class="field">Modèle vision
-      <input id="model" value="meta-llama/llama-4-scout-17b-16e-instruct">
+      <input id="model" value="qwen/qwen3.6-27b" list="models"><datalist id="models"><option value="qwen/qwen3.6-27b"><option value="qwen/qwen3.8-27b"></datalist>
     </label>
     <label class="field">Fréquence du scan
       <select id="every">
@@ -124,10 +124,10 @@
     set(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
   };
   el.key.value = store.get('sc_key', '');
-  el.model.value = store.get('sc_model', el.model.value);
+  el.model.value = store.get('sc_model2', el.model.value);
   el.every.value = store.get('sc_every', el.every.value);
   el.expiry.value = store.get('sc_expiry', el.expiry.value);
-  [['key','sc_key'],['model','sc_model'],['every','sc_every'],['expiry','sc_expiry']].forEach(([i,k]) =>
+  [['key','sc_key'],['model','sc_model2'],['every','sc_every'],['expiry','sc_expiry']].forEach(([i,k]) =>
     el[i].addEventListener('change', () => { store.set(k, el[i].value); if(i==='every') restartLoop(); }));
   el.key.addEventListener('input', () => store.set('sc_key', el.key.value.trim()));
 
@@ -222,7 +222,7 @@ Règles : si le graphique n'est pas lisible, ou si la situation est floue ou en 
         body: JSON.stringify({
           model: el.model.value.trim(),
           temperature: 0.2,
-          max_tokens: 400,
+          max_tokens: 1500,
           messages:[{ role:'user', content:[
             { type:'text', text: prompt() },
             { type:'image_url', image_url:{ url: f.url } }
@@ -231,12 +231,13 @@ Règles : si le graphique n'est pas lisible, ou si la situation est floue ou en 
       });
       if(!r.ok){
         const t = await r.text();
+        if(r.status === 404) throw new Error("Modèle introuvable. Dans Réglages, essaie qwen/qwen3.6-27b ou qwen/qwen3.8-27b.");
         if(r.status === 401) throw new Error("Clé Groq refusée. Vérifie-la dans Réglages.");
         if(r.status === 429) throw new Error("Limite Groq atteinte. Passe à un scan plus espacé.");
         throw new Error("Erreur Groq " + r.status + " : " + t.slice(0, 160));
       }
       const data = await r.json();
-      const txt = data.choices?.[0]?.message?.content || '';
+      const txt = (data.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '');
       const m = txt.match(/\{[\s\S]*\}/);
       if(!m) throw new Error("Réponse illisible du modèle.");
       render(JSON.parse(m[0]));
