@@ -80,6 +80,8 @@
     <label class="field">Modèle vision
       <input id="model" value="qwen/qwen3.6-27b" list="models"><datalist id="models"><option value="qwen/qwen3.6-27b"><option value="qwen/qwen3.8-27b"></datalist>
     </label>
+    <button id="loadModels" style="margin-top:10px;width:100%">Charger les modèles de mon compte</button>
+    <div id="modelList" class="note" style="margin-top:8px"></div>
     <label class="field">Fréquence du scan
       <select id="every">
         <option value="5">Toutes les 5 secondes</option>
@@ -135,6 +137,31 @@
 
   function showError(msg){ el.error.textContent = msg; el.error.style.display = msg ? 'block' : 'none'; }
   function setLive(on, text){ el.dot.classList.toggle('live', on); el.statusText.textContent = text; }
+
+  // --- liste des modèles réellement disponibles sur le compte
+  async function loadModels(){
+    const key = el.key.value.trim(), box = $('modelList');
+    if(!key){ box.textContent = "Ajoute d'abord ta clé Groq."; return; }
+    box.textContent = 'Chargement…';
+    try{
+      const r = await fetch('https://api.groq.com/openai/v1/models', { headers:{ 'Authorization':'Bearer ' + key } });
+      if(!r.ok) throw new Error('Erreur ' + r.status + (r.status === 401 ? ' : clé refusée.' : ''));
+      const ids = (await r.json()).data.map(m => m.id)
+        .filter(id => !/whisper|tts|guard|embed|orpheus|playai/i.test(id)).sort();
+      const likely = ids.filter(id => /vision|scout|maverick|llama-4|qwen|pixtral|gemma|vl/i.test(id));
+      const dl = $('models'); dl.innerHTML = '';
+      ids.forEach(id => { const o = document.createElement('option'); o.value = id; dl.appendChild(o); });
+      box.innerHTML = '';
+      const t = document.createElement('div'); t.textContent = 'Clique sur un modèle pour le choisir (ceux qui lisent les images sont probablement en premier) :'; box.appendChild(t);
+      [...likely, ...ids.filter(i => !likely.includes(i))].forEach(id => {
+        const b = document.createElement('button');
+        b.textContent = id; b.style.cssText = 'display:block;width:100%;margin-top:4px;text-align:left;font-weight:500;font-size:13px';
+        b.onclick = () => { el.model.value = id; store.set('sc_model2', id); box.textContent = 'Modèle choisi : ' + id; };
+        box.appendChild(b);
+      });
+    }catch(e){ box.textContent = e.message || String(e); }
+  }
+  $('loadModels').addEventListener('click', loadModels);
 
   // --- capture écran
   async function startShare(){
@@ -231,7 +258,7 @@ Règles : si le graphique n'est pas lisible, ou si la situation est floue ou en 
       });
       if(!r.ok){
         const t = await r.text();
-        if(r.status === 404) throw new Error("Modèle introuvable. Dans Réglages, essaie qwen/qwen3.6-27b ou qwen/qwen3.8-27b.");
+        if(r.status === 404) { loadModels(); throw new Error("Modèle introuvable sur ton compte. Ouvre Réglages : ta liste de modèles vient de se charger, choisis-en un."); }
         if(r.status === 401) throw new Error("Clé Groq refusée. Vérifie-la dans Réglages.");
         if(r.status === 429) throw new Error("Limite Groq atteinte. Passe à un scan plus espacé.");
         throw new Error("Erreur Groq " + r.status + " : " + t.slice(0, 160));
