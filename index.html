@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Scan 1 min</title>
+<title>Scan 1 min Forex</title>
 <style>
 :root{
   --bg:#eef1f4; --panel:#ffffff; --ink:#18263a; --mute:#66758a; --line:#d9dfe6;
@@ -39,6 +39,8 @@ h2{font-size:18px;margin:28px 0 10px}
 .empty{color:var(--mute);padding:10px 0}
 .note{color:var(--mute);font-size:13px;margin-top:22px}
 .err{color:var(--sell);font-size:14px;margin-bottom:10px}
+.key{display:flex;gap:8px;margin-bottom:12px}.key input{flex:1;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+.warn{color:var(--wait);font-size:12px}
 button{font:inherit;background:var(--ink);color:var(--bg);border:0;border-radius:8px;padding:8px 14px;cursor:pointer}
 button:focus-visible{outline:3px solid var(--buy);outline-offset:2px}
 @media (max-width:560px){.row{grid-template-columns:1fr auto}.meta{grid-column:1/-1}.sig{grid-row:1;grid-column:2}}
@@ -48,25 +50,29 @@ button:focus-visible{outline:3px solid var(--buy);outline-offset:2px}
 <div class="wrap">
   <header>
     <div>
-      <h1>Scan 1 minute</h1>
+      <h1>Scan 1 minute · Forex</h1>
       <div class="status" id="status">Chargement…</div>
     </div>
     <button id="refresh">Scanner maintenant</button>
   </header>
+  <div class="key"><input id="key" type="password" placeholder="Clé API Twelve Data" autocomplete="off" aria-label="Clé API Twelve Data"><button id="save">Enregistrer</button></div>
   <div class="bar"><i id="prog"></i></div>
   <div class="err" id="err" hidden></div>
   <div id="rows"></div>
   <h2>Historique des signaux</h2>
   <div class="log" id="log"><div class="empty">Aucun signal pour l’instant.</div></div>
-  <p class="note">Bougies 1 min Binance. Signal = score de 4 indicateurs (EMA 9/21, RSI 14, MACD, Bandes de Bollinger). Le scan tourne tant que cette page reste ouverte. Ce sont des indicateurs techniques, pas une garantie de résultat.</p>
+  <p class="note">Bougies 1 min Twelve Data (forex). Signal = score de 4 indicateurs (EMA 9/21, RSI 14, MACD, Bandes de Bollinger). Ta clé reste dans ton navigateur (jamais dans le code). Plan gratuit : 8 crédits/minute et 800/jour, 1 crédit par paire et par scan. Le forex est fermé du vendredi soir au dimanche soir. Le scan tourne tant que cette page reste ouverte. Ce sont des indicateurs techniques, pas une garantie de résultat.</p>
 </div>
 
 <script>
-const PAIRS = ["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT","DOGEUSDT","ADAUSDT","EURUSDT"];
-const SCAN_EVERY = 60; // secondes
-const API = "https://api.binance.com/api/v3/klines?interval=1m&limit=120&symbol=";
+const PAIRS = ["EUR/USD","GBP/USD","USD/JPY"]; // 8 paires max sur le plan gratuit
+const SCAN_EVERY = 60, DAILY_CAP = 800;
 let countdown = SCAN_EVERY, scanning = false, lastSig = {}, history = [];
 
+const store={
+  get(k){try{return localStorage.getItem(k)}catch(e){return null}},
+  set(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+};
 const ema = (a,p)=>{const k=2/(p+1),r=[a[0]];for(let i=1;i<a.length;i++)r.push(a[i]*k+r[i-1]*(1-k));return r};
 function rsi(c,p=14){
   let g=0,l=0;
@@ -91,39 +97,59 @@ function analyse(c){
   return {last,score,rsi:r,hist:h0,trend:e9[e9.length-1]>e21[e21.length-1]?"haussier":"baissier"};
 }
 const label=s=>s>=3?["ACHAT","fort"]:s>=2?["ACHAT","modéré"]:s<=-3?["VENTE","fort"]:s<=-2?["VENTE","modéré"]:["ATTENTE","pas de signal"];
-const fmt=n=>n>=100?n.toFixed(2):n>=1?n.toFixed(4):n.toFixed(6);
-const nm=p=>p.replace("USDT","/USDT");
+const fmt=n=>n>=20?n.toFixed(3):n.toFixed(5);
 
-async function scanOne(sym){
-  const res=await fetch(API+sym);
-  if(!res.ok) throw new Error(sym+" "+res.status);
-  const k=await res.json();
-  return {sym,...analyse(k.slice(0,-1).concat([k[k.length-1]]).map(x=>+x[4]))};
+function creditsToday(){
+  const d=new Date().toISOString().slice(0,10);
+  if(store.get("day")!==d){store.set("day",d);store.set("used","0");}
+  return +store.get("used")||0;
 }
+const setMsg=m=>{const e=document.getElementById("err");e.hidden=!m;e.textContent=m||""};
+
 async function scan(){
-  if(scanning) return; scanning=true;
+  if(scanning) return;
+  const key=(document.getElementById("key").value||"").trim();
+  if(!key){setMsg("Colle ta clé API Twelve Data (gratuite sur twelvedata.com) puis clique sur Enregistrer.");countdown=SCAN_EVERY;return;}
+  if(creditsToday()+PAIRS.length>DAILY_CAP){setMsg("Limite de "+DAILY_CAP+" crédits atteinte pour aujourd’hui. Le scan reprend demain (minuit UTC).");countdown=SCAN_EVERY;return;}
+  scanning=true;
   document.getElementById("status").textContent="Scan en cours…";
-  const out=await Promise.allSettled(PAIRS.map(scanOne));
-  const ok=out.filter(o=>o.status==="fulfilled").map(o=>o.value);
-  const bad=out.filter(o=>o.status==="rejected").length;
-  const err=document.getElementById("err");
-  err.hidden=!bad; err.textContent=bad?bad+" paire(s) non chargée(s). Vérifie ta connexion ou réessaie.":"";
-  const now=new Date().toLocaleTimeString("fr-FR");
-  let active=0;
-  document.getElementById("rows").innerHTML=ok.map(o=>{
-    const [t,sub]=label(o.score),cls=o.score>=2?"buy":o.score<=-2?"sell":"wait";
-    if(cls!=="wait") active++;
-    if(cls!=="wait"&&lastSig[o.sym]!==t){history.unshift({time:now,sym:o.sym,t,sub,price:o.last});}
-    lastSig[o.sym]=cls==="wait"?null:t;
-    return `<div class="row ${cls}">
-      <div class="pair"><b>${nm(o.sym)}</b><span>${fmt(o.last)}</span></div>
-      <div class="meta"><span>Tendance <em>${o.trend}</em></span><span>RSI <em>${o.rsi.toFixed(1)}</em></span><span>MACD <em>${o.hist>0?"+":"−"}</em></span><span>Score <em>${o.score>0?"+":""}${o.score}/4</em></span></div>
-      <div class="sig">${t}<small>${sub}</small></div></div>`;
-  }).join("");
-  history=history.slice(0,30);
-  document.getElementById("log").innerHTML=history.length?history.map(h=>`<div><span>${h.time} · ${nm(h.sym)} @ ${fmt(h.price)}</span><span class="${h.t==="ACHAT"?"b":"s"}">${h.t} (${h.sub})</span></div>`).join(""):'<div class="empty">Aucun signal pour l’instant.</div>';
-  document.title=(active?"("+active+") ":"")+"Scan 1 min";
-  document.getElementById("status").textContent="Dernier scan à "+now+" — "+active+" signal(s) actif(s)";
+  try{
+    const url="https://api.twelvedata.com/time_series?interval=1min&outputsize=120&timezone=UTC&symbol="+encodeURIComponent(PAIRS.join(","))+"&apikey="+encodeURIComponent(key);
+    const res=await fetch(url);
+    const data=await res.json();
+    store.set("used",String(creditsToday()+PAIRS.length));
+    if(data.status==="error"&&!data.values) throw new Error(data.message||"Erreur API");
+    const byPair=PAIRS.length===1?{[PAIRS[0]]:data}:data;
+    const ok=[];let bad=0;
+    for(const sym of PAIRS){
+      const d=byPair[sym];
+      if(!d||d.status==="error"||!d.values||d.values.length<35){bad++;continue;}
+      const closes=d.values.map(v=>+v.close).reverse();
+      const t=new Date(d.values[0].datetime.replace(" ","T")+"Z");
+      ok.push({sym,...analyse(closes),ageMin:(Date.now()-t.getTime())/60000,at:t});
+    }
+    setMsg(bad?bad+" paire(s) non chargée(s). Vérifie ta clé ou réessaie.":"");
+    const now=new Date().toLocaleTimeString("fr-FR");
+    let active=0;
+    document.getElementById("rows").innerHTML=ok.map(o=>{
+      const stale=o.ageMin>10;
+      const [t,sub]=stale?["ATTENTE","marché fermé"]:label(o.score);
+      const cls=stale?"wait":o.score>=2?"buy":o.score<=-2?"sell":"wait";
+      if(cls!=="wait"){active++;if(lastSig[o.sym]!==t)history.unshift({time:now,sym:o.sym,t,sub,price:o.last});}
+      lastSig[o.sym]=cls==="wait"?null:t;
+      return `<div class="row ${cls}">
+        <div class="pair"><b>${o.sym}</b><span>${fmt(o.last)}</span></div>
+        <div class="meta"><span>Tendance <em>${o.trend}</em></span><span>RSI <em>${o.rsi.toFixed(1)}</em></span><span>MACD <em>${o.hist>0?"+":"−"}</em></span><span>Score <em>${o.score>0?"+":""}${o.score}/4</em></span><span>Bougie <em>${o.at.toISOString().slice(11,16)} UTC</em></span>${stale?'<span class="warn">données anciennes</span>':""}</div>
+        <div class="sig">${t}<small>${sub}</small></div></div>`;
+    }).join("");
+    history=history.slice(0,30);
+    document.getElementById("log").innerHTML=history.length?history.map(h=>`<div><span>${h.time} · ${h.sym} @ ${fmt(h.price)}</span><span class="${h.t==="ACHAT"?"b":"s"}">${h.t} (${h.sub})</span></div>`).join(""):'<div class="empty">Aucun signal pour l’instant.</div>';
+    document.title=(active?"("+active+") ":"")+"Scan 1 min Forex";
+    document.getElementById("status").textContent="Dernier scan à "+now+" — "+active+" signal(s) actif(s) — crédits : "+creditsToday()+"/"+DAILY_CAP;
+  }catch(e){
+    setMsg("Scan impossible : "+e.message);
+    document.getElementById("status").textContent="Échec du scan";
+  }
   countdown=SCAN_EVERY; scanning=false;
 }
 setInterval(()=>{
@@ -131,6 +157,8 @@ setInterval(()=>{
   document.getElementById("prog").style.width=((SCAN_EVERY-countdown)/SCAN_EVERY*100)+"%";
   if(countdown===0) scan();
 },1000);
+document.getElementById("key").value=store.get("tdkey")||"";
+document.getElementById("save").onclick=()=>{store.set("tdkey",document.getElementById("key").value.trim());scan();};
 document.getElementById("refresh").onclick=scan;
 scan();
 </script>
