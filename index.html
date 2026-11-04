@@ -44,10 +44,10 @@ ul{padding-left:18px;margin:6px 0}
     <input type="file" id="file" accept="image/*" hidden>
     <img id="prev" alt="Aperçu du graphique">
     <div class="row">
-      <label style="flex-basis:100%">Clé API Grok / xAI (reste dans ton navigateur)<input id="key" type="password" placeholder="xai-..." autocomplete="off"></label>
+      <label style="flex-basis:100%">Clé API Groq (reste dans ton navigateur)<input id="key" type="password" placeholder="gsk_..." autocomplete="off"></label>
     </div>
     <div class="row">
-      <label style="flex-basis:100%">Modèle Grok (avec vision)<input id="model" value="grok-4-1-fast-reasoning"></label>
+      <label style="flex-basis:100%">Modèle Groq (avec vision)<input id="model" value="meta-llama/llama-4-scout-17b-16e-instruct"></label>
     </div>
     <div class="row">
       <label>Paire / actif (optionnel)<input id="pair" placeholder="ex. EUR/USD"></label>
@@ -64,7 +64,7 @@ ul{padding-left:18px;margin:6px 0}
 <script>
 const $=id=>document.getElementById(id);
 let blob=null;
-try{const k=localStorage.getItem("xai_key");if(k)document.getElementById("key").value=k}catch(_){}
+try{const k=localStorage.getItem("groq_key");if(k)document.getElementById("key").value=k}catch(_){}
 const STRAT="Trend Following, Price Action, Breakout Trading, Pullback Trading, Range Trading, Swing Trading, Position Trading, Momentum Trading, Mean Reversion, Support & Resistance, Fibonacci Trading, Moving Average Strategy, RSI Strategy, MACD Strategy, Bollinger Bands, Ichimoku, Elliott Wave, Harmonic Patterns, Candlestick Patterns, Fundamental Analysis";
 const ADV="Smart Money Concepts (SMC), ICT Concepts, Wyckoff Method, Market Structure, Liquidity Concepts, Order Blocks, Fair Value Gaps (FVG), Volume Profile, Market Profile, Auction Market Theory, Supply and Demand, Multi-Timeframe Analysis";
 
@@ -87,9 +87,10 @@ $("go").onclick=async()=>{
   $("err").textContent="";
   const btn=$("go");btn.disabled=true;btn.textContent="Analyse en cours…";
   try{
+    if(blob.size>3.5*1024*1024){throw new Error("Image trop lourde (max ~4 Mo pour Groq). Fais un screenshot plus petit.");}
     const key=$("key").value.trim();
-    if(!key){throw new Error("Colle ta clé API Grok (xAI) dans le champ prévu.");}
-    try{localStorage.setItem("xai_key",key)}catch(_){}
+    if(!key){throw new Error("Colle ta clé API Groq (console.groq.com/keys) dans le champ prévu.");}
+    try{localStorage.setItem("groq_key",key)}catch(_){}
     const pair=$("pair").value.trim(),tf=$("tf").value;
     const prompt=`Tu es un analyste de graphiques de trading (scalping binaire/forex, bougies courtes). Analyse le screenshot joint.
 ${pair?"Actif indiqué : "+pair+".":""} ${tf?"Timeframe indiqué : "+tf+".":"Timeframe non indiqué : déduis-le de l’axe du temps si visible, sinon dis-le."}
@@ -107,12 +108,12 @@ Concepts avancés : ${ADV}.
 Réponds UNIQUEMENT avec du JSON valide, en français, sans markdown, de cette forme :
 {"decision":"ACHAT|VENTE|ATTENDRE","confiance":"FAIBLE|MODÉRÉE|FORTE","concept_principal":"...","concepts_secondaires":["..."],"timeframe_detecte":"...","description_graphique":"2-3 phrases","prix_entree":"1.1220 ou null","type_entree":"au marché | limite sur retest de ... ","stop":"... ou null","objectif":"... ou null","duree_minutes":"ex. 3","raisons":["...","...","..."],"risques":["..."]}`;
     const b64=await new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(r.result.split(",")[1]);r.onerror=()=>ko(new Error("Lecture de l’image impossible"));r.readAsDataURL(blob)});
-    const model=$("model").value.trim()||"grok-4-1-fast-reasoning";
-    const resp=await fetch("https://api.x.ai/v1/chat/completions",{
+    const model=$("model").value.trim()||"meta-llama/llama-4-scout-17b-16e-instruct";
+    const resp=await fetch("https://api.groq.com/openai/v1/chat/completions",{
       method:"POST",
       headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
-      body:JSON.stringify({model:model,max_tokens:2000,messages:[{role:"user",content:[
-        {type:"image_url",image_url:{url:"data:"+(blob.type||"image/png")+";base64,"+b64,detail:"high"}},
+      body:JSON.stringify({model:model,max_completion_tokens:1500,temperature:0.3,messages:[{role:"user",content:[
+        {type:"image_url",image_url:{url:"data:"+(blob.type||"image/png")+";base64,"+b64}},
         {type:"text",text:prompt}]}]})
     });
     const data=await resp.json().catch(()=>({}));
