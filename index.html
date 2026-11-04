@@ -1,328 +1,300 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Scanner d'écran</title>
+<title>Chart Scanner</title>
 <style>
   :root{
-    --bg:#101214; --panel:#171a1d; --line:#2a2f34; --text:#e8eaec; --muted:#8b939b;
-    --up:#2fd18b; --down:#ff5c6c; --wait:#e0b84a; --accent:#7aa2ff;
+    --bg:#0a0a0c; --card:#121216; --line:#24242c; --txt:#eceaf2; --mut:#8b8a99;
+    --gold:#d4af37; --buy:#22c55e; --sell:#ef4444; --wait:#f59e0b;
   }
-  *{box-sizing:border-box;margin:0}
-  html,body{height:100%}
-  body{background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:16px;display:flex;justify-content:center}
-  #panel{width:100%;max-width:420px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px;align-self:flex-start}
-  header{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  h1{font-size:17px;font-weight:650;letter-spacing:.2px}
-  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);display:inline-block;margin-right:8px}
-  .dot.live{background:var(--up);box-shadow:0 0 0 0 rgba(47,209,139,.6);animation:pulse 1.6s infinite}
-  @keyframes pulse{70%{box-shadow:0 0 0 8px rgba(47,209,139,0)}100%{box-shadow:0 0 0 0 rgba(47,209,139,0)}}
-  #status{font-size:13px;color:var(--muted)}
-  .row{display:flex;gap:8px}
-  button,select,input{font:inherit;color:var(--text);background:#1f2327;border:1px solid var(--line);border-radius:9px;padding:9px 12px}
-  button{cursor:pointer;flex:1;font-weight:600}
-  button:hover{border-color:#3b434a}
-  button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  button.primary{background:var(--accent);border-color:var(--accent);color:#0b1020}
-  button.stop{background:#3a1d22;border-color:#5a2a32;color:#ffb3bb}
-  #preview{width:100%;border-radius:9px;border:1px solid var(--line);background:#0b0c0e;aspect-ratio:16/9;object-fit:contain;display:none}
-  #verdict{border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center;background:#13161a}
-  #signal{font-size:26px;font-weight:750;letter-spacing:.3px}
-  #signal.up{color:var(--up)} #signal.down{color:var(--down)} #signal.wait{color:var(--wait)}
-  #meta{display:flex;justify-content:center;gap:16px;margin-top:6px;font-size:14px;color:var(--muted)}
-  #meta b{color:var(--text);font-weight:650}
-  #reason{margin-top:10px;font-size:14px}
-  #levels{margin-top:8px;font-size:13px;color:var(--muted)}
-  #error{display:none;color:#ffb3bb;background:#3a1d22;border:1px solid #5a2a32;border-radius:9px;padding:10px 12px;font-size:13px}
-  details{border-top:1px solid var(--line);padding-top:12px}
-  summary{cursor:pointer;color:var(--muted);font-size:14px}
-  .field{display:flex;flex-direction:column;gap:5px;margin-top:10px;font-size:13px;color:var(--muted)}
-  .field input,.field select{width:100%}
-  #history{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);max-height:120px;overflow:auto}
-  #history span.u{color:var(--up)} #history span.d{color:var(--down)} #history span.w{color:var(--wait)}
-  .note{font-size:12px;color:var(--muted)}
-  @media (prefers-reduced-motion:reduce){.dot.live{animation:none}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh}
+  .wrap{max-width:900px;margin:0 auto;padding:20px 16px 60px}
+  h1{font-size:22px;letter-spacing:.18em;text-transform:uppercase;margin:6px 0 4px;color:var(--gold)}
+  .sub{color:var(--mut);font-size:13px;margin-bottom:20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+  label{display:block;font-size:12px;color:var(--mut);margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em}
+  input,select{width:100%;background:#0d0d10;border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:11px 12px;font-size:15px;outline:none}
+  input:focus,select:focus{border-color:var(--gold)}
+  .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .drop{border:2px dashed var(--line);border-radius:14px;padding:26px 14px;text-align:center;cursor:pointer;color:var(--mut);transition:.2s}
+  .drop:hover,.drop.over{border-color:var(--gold);color:var(--txt)}
+  .drop b{color:var(--gold)}
+  #preview{max-width:100%;border-radius:10px;margin-top:12px;display:none;border:1px solid var(--line)}
+  button.go{width:100%;margin-top:14px;padding:15px;border:0;border-radius:12px;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;background:linear-gradient(135deg,#d4af37,#a88418);color:#111}
+  button.go:disabled{opacity:.45;cursor:not-allowed}
+  .small{font-size:12px;color:var(--mut)}
+  .link{color:var(--gold);cursor:pointer;text-decoration:underline}
+  #result{display:none}
+  .decision{text-align:center;padding:22px 10px;border-radius:14px;border:2px solid var(--line);margin-bottom:14px}
+  .decision .d{font-size:40px;font-weight:800;letter-spacing:.1em}
+  .decision.BUY{border-color:var(--buy);background:rgba(34,197,94,.08)} .decision.BUY .d{color:var(--buy)}
+  .decision.SELL{border-color:var(--sell);background:rgba(239,68,68,.08)} .decision.SELL .d{color:var(--sell)}
+  .decision.WAIT{border-color:var(--wait);background:rgba(245,158,11,.08)} .decision.WAIT .d{color:var(--wait)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .kpi{background:#0d0d10;border:1px solid var(--line);border-radius:12px;padding:12px}
+  .kpi span{display:block;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+  .kpi b{font-size:20px}
+  .tag{display:inline-block;background:#1b1b22;border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:13px;margin:3px 4px 3px 0}
+  .tag.main{border-color:var(--gold);color:var(--gold)}
+  ul{margin:8px 0 0;padding-left:18px} li{margin:5px 0;font-size:14px;line-height:1.45}
+  .err{color:#fca5a5;font-size:14px;display:none;margin-top:10px;white-space:pre-wrap}
+  .bar{height:8px;background:#0d0d10;border-radius:99px;overflow:hidden;margin-top:6px}
+  .bar i{display:block;height:100%;background:var(--gold);width:0}
+  .warn{font-size:12px;color:var(--mut);border-top:1px solid var(--line);padding-top:12px;margin-top:6px;line-height:1.5}
 </style>
 </head>
 <body>
-<div id="panel">
-  <header>
-    <h1>Scanner d'écran</h1>
-    <div id="status"><span class="dot" id="dot"></span><span id="statusText">Arrêté</span></div>
-  </header>
+<div class="wrap">
+  <h1>Chart Scanner</h1>
+  <div class="sub">Upload un screenshot du graphique. L'IA lit les bougies et te donne : acheter / vendre, prix d'entrée, durée du trade.</div>
 
-  <video id="preview" muted playsinline></video>
-
-  <div id="verdict">
-    <div id="signal" class="wait">En attente</div>
-    <div id="meta"><span>Confiance <b id="conf">–</b></span><span>Minuteur <b id="timer">–</b></span></div>
-    <div id="reason">Partage ton écran de trading pour démarrer.</div>
-    <div id="levels"></div>
+  <div class="card" id="keyCard">
+    <label>Clé API Groq</label>
+    <input id="key" type="password" placeholder="gsk_..." autocomplete="off">
+    <div class="small" style="margin-top:6px">Enregistrée seulement dans ton navigateur (localStorage). <span class="link" id="clearKey">Effacer</span></div>
   </div>
 
-  <div id="error"></div>
+  <div class="card">
+    <div class="drop" id="drop">
+      <div><b>Clique</b>, glisse une image ici, ou colle avec <b>Ctrl+V</b></div>
+      <div class="small" style="margin-top:6px">PNG / JPG — screenshot du graphique</div>
+    </div>
+    <input type="file" id="file" accept="image/*" hidden>
+    <img id="preview" alt="aperçu">
 
-  <div class="row">
-    <button class="primary" id="startBtn">Partager l'écran</button>
-    <button id="floatBtn" title="Garde le scanner au-dessus de ton graphique">Fenêtre flottante</button>
-  </div>
-  <div class="row">
-    <button id="nowBtn">Scanner maintenant</button>
-    <button class="stop" id="stopBtn" disabled>Arrêter</button>
-  </div>
+    <div class="row" style="margin-top:14px">
+      <div>
+        <label>Prix d'entrée (optionnel)</label>
+        <input id="entry" inputmode="decimal" placeholder="ex: 1.1220">
+      </div>
+      <div>
+        <label>Timeframe du graphique</label>
+        <select id="tf">
+          <option value="">Détecter automatiquement</option>
+          <option>5 secondes</option><option>15 secondes</option><option>30 secondes</option>
+          <option>1 minute</option><option>2 minutes</option><option>5 minutes</option>
+          <option>15 minutes</option><option>30 minutes</option><option>1 heure</option>
+          <option>4 heures</option><option>1 jour</option>
+        </select>
+      </div>
+      <div>
+        <label>Paire / actif (optionnel)</label>
+        <input id="pair" placeholder="ex: EUR/USD">
+      </div>
+    </div>
 
-  <details>
-    <summary>Réglages</summary>
-    <label class="field">Clé API Groq
-      <input id="key" type="password" placeholder="gsk_..." autocomplete="off">
-    </label>
-    <label class="field">Modèle vision
-      <input id="model" value="qwen/qwen3.6-27b" list="models"><datalist id="models"><option value="qwen/qwen3.6-27b"><option value="qwen/qwen3.8-27b"></datalist>
-    </label>
-    <button id="loadModels" style="margin-top:10px;width:100%">Charger les modèles de mon compte</button>
-    <div id="modelList" class="note" style="margin-top:8px"></div>
-    <label class="field">Fréquence du scan
-      <select id="every">
-        <option value="5">Toutes les 5 secondes</option>
-        <option value="10" selected>Toutes les 10 secondes</option>
-        <option value="20">Toutes les 20 secondes</option>
-        <option value="30">Toutes les 30 secondes</option>
-      </select>
-    </label>
-    <label class="field">Expiration visée
-      <select id="expiry">
-        <option value="30s">30 secondes</option>
-        <option value="1m" selected>1 minute</option>
-        <option value="3m">3 minutes</option>
-        <option value="5m">5 minutes</option>
-        <option value="15m">15 minutes</option>
-      </select>
-    </label>
-    <p class="note" style="margin-top:10px">La clé reste dans ton navigateur (localStorage). Le scan saute les images qui n'ont presque pas changé pour économiser ton quota.</p>
-  </details>
-
-  <div>
-    <div class="note" style="margin-bottom:6px">Derniers signaux</div>
-    <div id="history"></div>
+    <button class="go" id="go" disabled>Scanner le graphique</button>
+    <div class="err" id="err"></div>
   </div>
 
-  <p class="note">Une IA qui lit une capture d'écran ne prédit pas le marché. Prends ça comme une aide à la lecture du graphique, pas comme une certitude. N'engage que ce que tu peux perdre.</p>
+  <div id="result">
+    <div class="decision" id="decision">
+      <div class="small">DÉCISION</div>
+      <div class="d" id="dTxt">—</div>
+      <div class="small" id="dSub"></div>
+    </div>
+
+    <div class="card">
+      <div class="grid">
+        <div class="kpi"><span>Prix d'entrée</span><b id="kEntry">—</b></div>
+        <div class="kpi"><span>Durée du trade</span><b id="kDur">—</b></div>
+        <div class="kpi"><span>Timeframe lu</span><b id="kTf">—</b></div>
+        <div class="kpi"><span>Tendance</span><b id="kTrend">—</b></div>
+        <div class="kpi"><span>Stop / Invalidation</span><b id="kSl">—</b></div>
+        <div class="kpi"><span>Objectif</span><b id="kTp">—</b></div>
+      </div>
+      <div style="margin-top:14px">
+        <label>Confiance</label>
+        <b id="kConf">—</b>
+        <div class="bar"><i id="confBar"></i></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>Concepts détectés sur le graphique</label>
+      <div id="concepts"></div>
+    </div>
+
+    <div class="card">
+      <label>Pourquoi cette décision</label>
+      <ul id="reasons"></ul>
+      <label style="margin-top:14px">Niveaux repérés</label>
+      <ul id="levels"></ul>
+      <label style="margin-top:14px">Quand ne pas entrer</label>
+      <div id="avoid" style="font-size:14px;line-height:1.45"></div>
+    </div>
+
+    <div class="warn">L'analyse est une lecture IA d'une image : elle peut se tromper et aucun résultat n'est garanti. Les options binaires et le trading comportent un risque de perte totale. Ne mise que ce que tu peux perdre.</div>
+  </div>
 </div>
 
 <script>
-(() => {
-  const $ = id => document.getElementById(id);
-  const el = {
-    video:$('preview'), dot:$('dot'), statusText:$('statusText'), signal:$('signal'), conf:$('conf'),
-    timer:$('timer'), reason:$('reason'), levels:$('levels'), error:$('error'), start:$('startBtn'),
-    stop:$('stopBtn'), now:$('nowBtn'), float:$('floatBtn'), key:$('key'), model:$('model'),
-    every:$('every'), expiry:$('expiry'), history:$('history'), panel:$('panel')
+const STRATEGIES = [
+ "Trend Following","Price Action","Breakout Trading","Pullback Trading","Range Trading","Swing Trading",
+ "Position Trading","Momentum Trading","Mean Reversion","Support & Resistance","Fibonacci Trading",
+ "Moving Average Strategy","RSI Strategy","MACD Strategy","Bollinger Bands","Ichimoku","Elliott Wave",
+ "Harmonic Patterns","Candlestick Patterns","Fundamental Analysis"
+];
+const ADVANCED = [
+ "Smart Money Concepts (SMC)","ICT Concepts","Wyckoff Method","Market Structure","Liquidity Concepts",
+ "Order Blocks","Fair Value Gaps (FVG)","Volume Profile","Market Profile","Auction Market Theory",
+ "Supply and Demand","Multi-Timeframe Analysis"
+];
+const MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+
+const $ = id => document.getElementById(id);
+let imgData = null;
+
+$('key').value = localStorage.getItem('groq_key') || '';
+$('key').addEventListener('input', e => localStorage.setItem('groq_key', e.target.value.trim()));
+$('clearKey').onclick = () => { localStorage.removeItem('groq_key'); $('key').value=''; };
+
+const drop = $('drop'), file = $('file');
+drop.onclick = () => file.click();
+file.onchange = e => e.target.files[0] && loadFile(e.target.files[0]);
+['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => {e.preventDefault(); drop.classList.add('over')}));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => {e.preventDefault(); drop.classList.remove('over')}));
+drop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+window.addEventListener('paste', e => {
+  const it = [...(e.clipboardData?.items||[])].find(i => i.type.startsWith('image/'));
+  if (it) loadFile(it.getAsFile());
+});
+
+function loadFile(f){
+  if(!f.type.startsWith('image/')){ showErr("Ce fichier n'est pas une image."); return; }
+  const r = new FileReader();
+  r.onload = () => {
+    const im = new Image();
+    im.onload = () => {
+      // Réduit l'image pour rester sous la limite de l'API tout en gardant les bougies lisibles
+      const max = 1400, s = Math.min(1, max / Math.max(im.width, im.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(im.width*s); c.height = Math.round(im.height*s);
+      c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+      imgData = c.toDataURL('image/jpeg', .88);
+      $('preview').src = imgData; $('preview').style.display = 'block';
+      $('go').disabled = false; hideErr();
+    };
+    im.src = r.result;
   };
+  r.readAsDataURL(f);
+}
 
-  // --- réglages sauvegardés
-  const store = {
-    get(k, d){ try{ return localStorage.getItem(k) ?? d; }catch(e){ return d; } },
-    set(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
-  };
-  el.key.value = store.get('sc_key', '');
-  el.model.value = store.get('sc_model2', el.model.value);
-  el.every.value = store.get('sc_every', el.every.value);
-  el.expiry.value = store.get('sc_expiry', el.expiry.value);
-  [['key','sc_key'],['model','sc_model2'],['every','sc_every'],['expiry','sc_expiry']].forEach(([i,k]) =>
-    el[i].addEventListener('change', () => { store.set(k, el[i].value); if(i==='every') restartLoop(); }));
-  el.key.addEventListener('input', () => store.set('sc_key', el.key.value.trim()));
+function showErr(m){ const e=$('err'); e.textContent=m; e.style.display='block'; }
+function hideErr(){ $('err').style.display='none'; }
 
-  let stream = null, loop = null, busy = false, lastSig = null, lastFp = null;
+function buildPrompt(){
+  const entry = $('entry').value.trim(), tf = $('tf').value, pair = $('pair').value.trim();
+  return `Tu es un analyste technique expert en Forex et options binaires. Tu reçois un screenshot d'un graphique en chandeliers (souvent Pocket Option).
 
-  function showError(msg){ el.error.textContent = msg; el.error.style.display = msg ? 'block' : 'none'; }
-  function setLive(on, text){ el.dot.classList.toggle('live', on); el.statusText.textContent = text; }
+ÉTAPES:
+1. Lis le graphique: actif, timeframe (échelle de temps / durée d'une bougie), prix actuel, tendance, structure, niveaux, indicateurs visibles.
+2. Identifie la stratégie principale et les concepts qui s'appliquent le mieux, en choisissant UNIQUEMENT dans ces listes.
+STRATÉGIES: ${STRATEGIES.join(", ")}.
+CONCEPTS AVANCÉS: ${ADVANCED.join(", ")}.
+3. Décide: BUY (acheter/haut), SELL (vendre/bas) ou WAIT (pas de setup clair, attendre).
+4. Donne un prix d'entrée précis, ${entry ? `l'utilisateur prévoit d'entrer à ${entry}: évalue ce prix et ajuste si mauvais` : "basé sur le prix visible à droite du graphique ou un niveau d'entrée logique (pullback/retest)"}.
+5. Donne la durée du trade en MINUTES, cohérente avec le timeframe (en règle générale 1 à 5 bougies du timeframe lu; ex: bougies 1 min -> 2 à 5 min; bougies 5 s -> 1 min).
 
-  // --- liste des modèles réellement disponibles sur le compte
-  async function loadModels(){
-    const key = el.key.value.trim(), box = $('modelList');
-    if(!key){ box.textContent = "Ajoute d'abord ta clé Groq."; return; }
-    box.textContent = 'Chargement…';
-    try{
-      const r = await fetch('https://api.groq.com/openai/v1/models', { headers:{ 'Authorization':'Bearer ' + key } });
-      if(!r.ok) throw new Error('Erreur ' + r.status + (r.status === 401 ? ' : clé refusée.' : ''));
-      const ids = (await r.json()).data.map(m => m.id)
-        .filter(id => !/whisper|tts|guard|embed|orpheus|playai/i.test(id)).sort();
-      const likely = ids.filter(id => /vision|scout|maverick|llama-4|qwen|pixtral|gemma|vl/i.test(id));
-      const dl = $('models'); dl.innerHTML = '';
-      ids.forEach(id => { const o = document.createElement('option'); o.value = id; dl.appendChild(o); });
-      box.innerHTML = '';
-      const t = document.createElement('div'); t.textContent = 'Clique sur un modèle pour le choisir (ceux qui lisent les images sont probablement en premier) :'; box.appendChild(t);
-      [...likely, ...ids.filter(i => !likely.includes(i))].forEach(id => {
-        const b = document.createElement('button');
-        b.textContent = id; b.style.cssText = 'display:block;width:100%;margin-top:4px;text-align:left;font-weight:500;font-size:13px';
-        b.onclick = () => { el.model.value = id; store.set('sc_model2', id); box.textContent = 'Modèle choisi : ' + id; };
-        box.appendChild(b);
-      });
-    }catch(e){ box.textContent = e.message || String(e); }
-  }
-  $('loadModels').addEventListener('click', loadModels);
+CONTEXTE FOURNI: ${pair ? "Actif: "+pair+". " : ""}${tf ? "Timeframe: "+tf+"." : "Timeframe non fourni: déduis-le de l'axe du temps."}
 
-  // --- capture écran
-  async function startShare(){
-    showError('');
-    if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
-      showError("Ton navigateur ne permet pas le partage d'écran. Utilise Chrome ou Edge sur ordinateur.");
-      return;
+RÈGLES:
+- Base-toi uniquement sur ce qui est visible. N'invente pas de niveaux illisibles. Si l'image est floue ou illisible, mets WAIT et explique.
+- Si le marché est confus, en range serré ou sans confirmation, choisis WAIT.
+- Sois honnête sur la confiance (0-100). Ne dépasse pas 80 sauf confluence très claire.
+- Réponds en français.
+
+Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, avec exactement ces clés:
+{
+ "decision": "BUY" | "SELL" | "WAIT",
+ "entry_price": "string (ex: 1.12200)",
+ "duration_minutes": number,
+ "timeframe_detected": "string",
+ "pair_detected": "string",
+ "trend": "Haussière" | "Baissière" | "Range",
+ "confidence": number,
+ "main_strategy": "une stratégie de la liste",
+ "other_concepts": ["concepts de la liste"],
+ "stop_level": "string ou N/A",
+ "target_level": "string ou N/A",
+ "key_levels": ["supports/résistances/zones repérés avec prix approximatif"],
+ "reasons": ["3 à 5 raisons concrètes liées à ce qui est visible"],
+ "avoid_if": "string: condition qui invalide le trade"
+}`;
+}
+
+$('go').onclick = async () => {
+  hideErr();
+  const key = $('key').value.trim();
+  if(!key){ showErr("Entre ta clé API Groq (gsk_...)."); return; }
+  if(!imgData){ showErr("Upload d'abord un screenshot."); return; }
+  const btn = $('go'); btn.disabled = true; btn.textContent = "Analyse en cours...";
+  try{
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions",{
+      method:"POST",
+      headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+key },
+      body: JSON.stringify({
+        model: MODEL,
+        temperature: 0.2,
+        max_tokens: 1200,
+        response_format: { type: "json_object" },
+        messages:[{ role:"user", content:[
+          { type:"text", text: buildPrompt() },
+          { type:"image_url", image_url:{ url: imgData } }
+        ]}]
+      })
+    });
+    if(!res.ok){
+      const t = await res.text();
+      throw new Error("Erreur API ("+res.status+")\n"+t.slice(0,400));
     }
-    try{
-      stream = await navigator.mediaDevices.getDisplayMedia({ video:{ frameRate:5 }, audio:false });
-    }catch(e){ showError("Partage annulé ou refusé."); return; }
-    el.video.srcObject = stream;
-    await el.video.play().catch(()=>{});
-    el.video.style.display = 'block';
-    el.start.disabled = true; el.stop.disabled = false;
-    stream.getVideoTracks()[0].addEventListener('ended', stopShare);
-    setLive(true, 'Scan en cours');
-    restartLoop();
-    scan(true);
+    const data = await res.json();
+    const raw = data.choices?.[0]?.message?.content || "";
+    let j;
+    try { j = JSON.parse(raw); }
+    catch { const m = raw.match(/\{[\s\S]*\}/); if(!m) throw new Error("Réponse illisible: "+raw.slice(0,200)); j = JSON.parse(m[0]); }
+    render(j);
+  }catch(e){
+    showErr(e.message || String(e));
+  }finally{
+    btn.disabled = false; btn.textContent = "Scanner le graphique";
   }
+};
 
-  function stopShare(){
-    clearInterval(loop); loop = null;
-    if(stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
-    el.video.srcObject = null; el.video.style.display = 'none';
-    el.start.disabled = false; el.stop.disabled = true;
-    setLive(false, 'Arrêté');
-  }
+function render(j){
+  const d = String(j.decision||"WAIT").toUpperCase();
+  const cls = d==="BUY"?"BUY":d==="SELL"?"SELL":"WAIT";
+  const label = cls==="BUY"?"ACHETER ▲":cls==="SELL"?"VENDRE ▼":"ATTENDRE ■";
+  const dec = $('decision'); dec.className = "decision "+cls;
+  $('dTxt').textContent = label;
+  $('dSub').textContent = [j.pair_detected, j.main_strategy].filter(Boolean).join(" · ");
 
-  function restartLoop(){
-    clearInterval(loop);
-    if(!stream) return;
-    loop = setInterval(() => scan(false), Number(el.every.value) * 1000);
-  }
+  const userEntry = $('entry').value.trim();
+  $('kEntry').textContent = cls==="WAIT" ? "—" : (j.entry_price || userEntry || "—");
+  const dur = Number(j.duration_minutes);
+  $('kDur').textContent = cls==="WAIT" ? "—" : (dur ? (dur<1 ? Math.round(dur*60)+" sec" : dur+" min") : "—");
+  $('kTf').textContent = j.timeframe_detected || "—";
+  $('kTrend').textContent = j.trend || "—";
+  $('kSl').textContent = j.stop_level || "N/A";
+  $('kTp').textContent = j.target_level || "N/A";
+  const c = Math.max(0, Math.min(100, Number(j.confidence)||0));
+  $('kConf').textContent = c+"%"; $('confBar').style.width = c+"%";
 
-  // --- image -> JPEG réduit + empreinte pour détecter les changements
-  function grab(){
-    const v = el.video;
-    if(!v.videoWidth) return null;
-    const maxW = 1280, scale = Math.min(1, maxW / v.videoWidth);
-    const c = document.createElement('canvas');
-    c.width = Math.round(v.videoWidth * scale); c.height = Math.round(v.videoHeight * scale);
-    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
-    const s = document.createElement('canvas'); s.width = 32; s.height = 32;
-    const sc = s.getContext('2d'); sc.drawImage(c, 0, 0, 32, 32);
-    const d = sc.getImageData(0, 0, 32, 32).data, fp = [];
-    for(let i = 0; i < d.length; i += 4) fp.push((d[i] + d[i+1] + d[i+2]) / 3);
-    return { url: c.toDataURL('image/jpeg', 0.72), fp };
-  }
+  const cc = $('concepts'); cc.innerHTML = "";
+  const add = (t, main) => { const s=document.createElement('span'); s.className="tag"+(main?" main":""); s.textContent=t; cc.appendChild(s); };
+  if(j.main_strategy) add(j.main_strategy, true);
+  (j.other_concepts||[]).forEach(x => add(x,false));
 
-  function changed(fp){
-    if(!lastFp) return true;
-    let diff = 0;
-    for(let i = 0; i < fp.length; i++) diff += Math.abs(fp[i] - lastFp[i]);
-    return diff / fp.length > 1.2;
-  }
+  const fill = (id, arr) => { const u=$(id); u.innerHTML=""; (arr||[]).forEach(t => { const li=document.createElement('li'); li.textContent=t; u.appendChild(li); }); };
+  fill('reasons', j.reasons); fill('levels', j.key_levels);
+  $('avoid').textContent = j.avoid_if || "—";
 
-  // --- appel Groq
-  function prompt(){
-    return `Tu es un assistant de lecture de graphiques pour options binaires (Pocket Option). Tu vois une capture d'écran.
-Analyse UNIQUEMENT ce qui est visible : tendance, bougies récentes, supports/résistances, indicateurs affichés, niveau de prix actuel, minuteur ou expiration si visibles.
-Expiration visée par l'utilisateur : ${el.expiry.value}.
-Réponds UNIQUEMENT avec un JSON valide, sans texte autour, avec ces clés :
-{"signal":"HAUT" | "BAS" | "ATTENDRE",
- "confiance": nombre entier de 0 à 100,
- "minuteur": "durée conseillée, ex: 1m",
- "ordre_en_attente": "niveau de prix pour un ordre en attente, ou null",
- "raison": "une phrase courte en français, concrète",
- "outils": "outil de dessin utile (ligne de support, résistance, tendance...) ou null"}
-Règles : si le graphique n'est pas lisible, ou si la situation est floue ou en range, réponds ATTENDRE avec une confiance basse. Ne donne jamais HAUT ou BAS par défaut. Ne promets rien.`;
-  }
-
-  async function scan(force){
-    if(busy || !stream) return;
-    const key = el.key.value.trim();
-    if(!key){ showError("Ajoute ta clé API Groq dans Réglages."); return; }
-    const f = grab();
-    if(!f) return;
-    if(!force && !changed(f.fp)){ setLive(true, 'Écran stable, en veille'); return; }
-    busy = true; showError(''); setLive(true, 'Analyse…');
-    try{
-      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + key },
-        body: JSON.stringify({
-          model: el.model.value.trim(),
-          temperature: 0.2,
-          max_tokens: 1500,
-          messages:[{ role:'user', content:[
-            { type:'text', text: prompt() },
-            { type:'image_url', image_url:{ url: f.url } }
-          ]}]
-        })
-      });
-      if(!r.ok){
-        const t = await r.text();
-        if(r.status === 404) { loadModels(); throw new Error("Modèle introuvable sur ton compte. Ouvre Réglages : ta liste de modèles vient de se charger, choisis-en un."); }
-        if(r.status === 401) throw new Error("Clé Groq refusée. Vérifie-la dans Réglages.");
-        if(r.status === 429) throw new Error("Limite Groq atteinte. Passe à un scan plus espacé.");
-        throw new Error("Erreur Groq " + r.status + " : " + t.slice(0, 160));
-      }
-      const data = await r.json();
-      const txt = (data.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '');
-      const m = txt.match(/\{[\s\S]*\}/);
-      if(!m) throw new Error("Réponse illisible du modèle.");
-      render(JSON.parse(m[0]));
-      lastFp = f.fp;
-      setLive(true, 'Scan en cours');
-    }catch(e){
-      showError(e.message || String(e));
-      setLive(true, 'Scan en cours');
-    }finally{ busy = false; }
-  }
-
-  function render(o){
-    const sig = String(o.signal || 'ATTENDRE').toUpperCase();
-    const cls = sig === 'HAUT' ? 'up' : sig === 'BAS' ? 'down' : 'wait';
-    const label = sig === 'HAUT' ? 'ACHETER (HAUT)' : sig === 'BAS' ? 'VENDRE (BAS)' : 'ATTENDRE';
-    el.signal.textContent = label; el.signal.className = cls;
-    el.conf.textContent = (Number.isFinite(+o.confiance) ? Math.round(+o.confiance) + '%' : '–');
-    el.timer.textContent = sig === 'ATTENDRE' ? '–' : (o.minuteur || el.expiry.value);
-    el.reason.textContent = o.raison || '';
-    const parts = [];
-    if(o.ordre_en_attente && o.ordre_en_attente !== 'null') parts.push('Ordre en attente : ' + o.ordre_en_attente);
-    if(o.outils && o.outils !== 'null') parts.push('Outil : ' + o.outils);
-    el.levels.textContent = parts.join('  |  ');
-    if(sig !== lastSig){
-      const row = document.createElement('div');
-      const t = new Date().toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
-      row.innerHTML = '<span class="' + cls[0] + '">' + t + '  ' + label + '</span>';
-      el.history.prepend(row);
-      while(el.history.children.length > 30) el.history.lastChild.remove();
-      lastSig = sig;
-    }
-  }
-
-  // --- fenêtre flottante (Chrome / Edge) : reste au-dessus du graphique
-  async function floatPanel(){
-    if(!('documentPictureInPicture' in window)){
-      showError("La fenêtre flottante demande Chrome ou Edge récent sur ordinateur.");
-      return;
-    }
-    try{
-      const pip = await documentPictureInPicture.requestWindow({ width: 400, height: 560 });
-      [...document.styleSheets].forEach(ss => {
-        try{
-          const css = [...ss.cssRules].map(r => r.cssText).join('');
-          const s = pip.document.createElement('style'); s.textContent = css; pip.document.head.appendChild(s);
-        }catch(e){}
-      });
-      pip.document.body.style.cssText = 'margin:0;padding:10px;background:#101214';
-      pip.document.body.appendChild(el.panel);
-      pip.addEventListener('pagehide', () => { document.body.appendChild(el.panel); });
-    }catch(e){ showError("Impossible d'ouvrir la fenêtre flottante."); }
-  }
-
-  el.start.addEventListener('click', startShare);
-  el.stop.addEventListener('click', stopShare);
-  el.now.addEventListener('click', () => { if(!stream) showError("Partage d'abord ton écran."); else scan(true); });
-  el.float.addEventListener('click', floatPanel);
-})();
+  $('result').style.display = 'block';
+  $('result').scrollIntoView({behavior:'smooth', block:'start'});
+}
 </script>
 </body>
 </html>
