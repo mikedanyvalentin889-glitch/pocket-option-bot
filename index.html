@@ -47,7 +47,7 @@ ul{padding-left:18px;margin:6px 0}
       <label style="flex-basis:100%">Clé API Groq (reste dans ton navigateur)<input id="key" type="password" placeholder="gsk_..." autocomplete="off"></label>
     </div>
     <div class="row">
-      <label style="flex-basis:100%">Modèle Groq (avec vision)<input id="model" value="meta-llama/llama-4-scout-17b-16e-instruct"></label>
+      <label style="flex-basis:100%">Modèle Groq (avec vision)<input id="model" value="qwen/qwen3.8-27b"></label>
     </div>
     <div class="row">
       <label>Paire / actif (optionnel)<input id="pair" placeholder="ex. EUR/USD"></label>
@@ -87,7 +87,7 @@ $("go").onclick=async()=>{
   $("err").textContent="";
   const btn=$("go");btn.disabled=true;btn.textContent="Analyse en cours…";
   try{
-    if(blob.size>3.5*1024*1024){throw new Error("Image trop lourde (max ~4 Mo pour Groq). Fais un screenshot plus petit.");}
+    if(blob.size>15*1024*1024){throw new Error("Image trop lourde (max ~15 Mo). Fais un screenshot plus petit.");}
     const key=$("key").value.trim();
     if(!key){throw new Error("Colle ta clé API Groq (console.groq.com/keys) dans le champ prévu.");}
     try{localStorage.setItem("groq_key",key)}catch(_){}
@@ -108,17 +108,17 @@ Concepts avancés : ${ADV}.
 Réponds UNIQUEMENT avec du JSON valide, en français, sans markdown, de cette forme :
 {"decision":"ACHAT|VENTE|ATTENDRE","confiance":"FAIBLE|MODÉRÉE|FORTE","concept_principal":"...","concepts_secondaires":["..."],"timeframe_detecte":"...","description_graphique":"2-3 phrases","prix_entree":"1.1220 ou null","type_entree":"au marché | limite sur retest de ... ","stop":"... ou null","objectif":"... ou null","duree_minutes":"ex. 3","raisons":["...","...","..."],"risques":["..."]}`;
     const b64=await new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(r.result.split(",")[1]);r.onerror=()=>ko(new Error("Lecture de l’image impossible"));r.readAsDataURL(blob)});
-    const model=$("model").value.trim()||"meta-llama/llama-4-scout-17b-16e-instruct";
+    const model=$("model").value.trim()||"qwen/qwen3.8-27b";
     const resp=await fetch("https://api.groq.com/openai/v1/chat/completions",{
       method:"POST",
       headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
-      body:JSON.stringify({model:model,max_completion_tokens:1500,temperature:0.3,messages:[{role:"user",content:[
+      body:JSON.stringify({model:model,max_completion_tokens:4000,temperature:0.3,messages:[{role:"user",content:[
         {type:"image_url",image_url:{url:"data:"+(blob.type||"image/png")+";base64,"+b64}},
         {type:"text",text:prompt}]}]})
     });
     const data=await resp.json().catch(()=>({}));
     if(!resp.ok){throw new Error((data.error&&(data.error.message||data.error))||data.error||"Erreur API "+resp.status);}
-    const txt=String(data.choices[0].message.content||"").replace(/```json|```/g,"").trim();
+    const txt=String(data.choices[0].message.content||"").replace(/<think>[\s\S]*?<\/think>/g,"").replace(/```json|```/g,"").trim();
     const res=JSON.parse(txt.slice(txt.indexOf("{"),txt.lastIndexOf("}")+1));
     render(res);
   }catch(e){
