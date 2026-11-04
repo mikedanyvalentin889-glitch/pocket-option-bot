@@ -1,299 +1,151 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chart Scanner</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Scanner de graphique</title>
 <style>
-  :root{
-    --bg:#0a0a0c; --card:#121216; --line:#24242c; --txt:#eceaf2; --mut:#8b8a99;
-    --gold:#d4af37; --buy:#22c55e; --sell:#ef4444; --wait:#f59e0b;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh}
-  .wrap{max-width:900px;margin:0 auto;padding:20px 16px 60px}
-  h1{font-size:22px;letter-spacing:.18em;text-transform:uppercase;margin:6px 0 4px;color:var(--gold)}
-  .sub{color:var(--mut);font-size:13px;margin-bottom:20px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
-  label{display:block;font-size:12px;color:var(--mut);margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em}
-  input,select{width:100%;background:#0d0d10;border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:11px 12px;font-size:15px;outline:none}
-  input:focus,select:focus{border-color:var(--gold)}
-  .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
-  .drop{border:2px dashed var(--line);border-radius:14px;padding:26px 14px;text-align:center;cursor:pointer;color:var(--mut);transition:.2s}
-  .drop:hover,.drop.over{border-color:var(--gold);color:var(--txt)}
-  .drop b{color:var(--gold)}
-  #preview{max-width:100%;border-radius:10px;margin-top:12px;display:none;border:1px solid var(--line)}
-  button.go{width:100%;margin-top:14px;padding:15px;border:0;border-radius:12px;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;background:linear-gradient(135deg,#d4af37,#a88418);color:#111}
-  button.go:disabled{opacity:.45;cursor:not-allowed}
-  .small{font-size:12px;color:var(--mut)}
-  .link{color:var(--gold);cursor:pointer;text-decoration:underline}
-  #result{display:none}
-  .decision{text-align:center;padding:22px 10px;border-radius:14px;border:2px solid var(--line);margin-bottom:14px}
-  .decision .d{font-size:40px;font-weight:800;letter-spacing:.1em}
-  .decision.BUY{border-color:var(--buy);background:rgba(34,197,94,.08)} .decision.BUY .d{color:var(--buy)}
-  .decision.SELL{border-color:var(--sell);background:rgba(239,68,68,.08)} .decision.SELL .d{color:var(--sell)}
-  .decision.WAIT{border-color:var(--wait);background:rgba(245,158,11,.08)} .decision.WAIT .d{color:var(--wait)}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
-  .kpi{background:#0d0d10;border:1px solid var(--line);border-radius:12px;padding:12px}
-  .kpi span{display:block;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
-  .kpi b{font-size:20px}
-  .tag{display:inline-block;background:#1b1b22;border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:13px;margin:3px 4px 3px 0}
-  .tag.main{border-color:var(--gold);color:var(--gold)}
-  ul{margin:8px 0 0;padding-left:18px} li{margin:5px 0;font-size:14px;line-height:1.45}
-  .err{color:#fca5a5;font-size:14px;display:none;margin-top:10px;white-space:pre-wrap}
-  .bar{height:8px;background:#0d0d10;border-radius:99px;overflow:hidden;margin-top:6px}
-  .bar i{display:block;height:100%;background:var(--gold);width:0}
-  .warn{font-size:12px;color:var(--mut);border-top:1px solid var(--line);padding-top:12px;margin-top:6px;line-height:1.5}
+:root{--bg:#0e1116;--card:#171b22;--bd:#262c36;--tx:#e8ecf2;--mu:#8b95a5;--ac:#4f8cff;--buy:#22c55e;--sell:#ef4444;--wait:#f59e0b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f4f6f9;--card:#fff;--bd:#dde2ea;--tx:#141922;--mu:#5d6676}}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
+.w{max-width:680px;margin:0 auto;padding:18px 14px 40px}
+h1{font-size:1.35rem;margin:0 0 4px}
+.sub{color:var(--mu);font-size:.9rem;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:14px}
+.drop{border:2px dashed var(--bd);border-radius:12px;padding:26px 12px;text-align:center;cursor:pointer;color:var(--mu)}
+.drop.on{border-color:var(--ac);color:var(--tx)}
+#prev{max-width:100%;border-radius:10px;display:none;margin-top:10px}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.row label{flex:1;min-width:140px;font-size:.8rem;color:var(--mu)}
+.row select,.row input{width:100%;margin-top:4px;padding:9px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font-size:.95rem}
+button{width:100%;margin-top:14px;padding:13px;border:0;border-radius:10px;background:var(--ac);color:#fff;font-size:1rem;font-weight:600;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+.dec{font-size:2rem;font-weight:800;letter-spacing:.5px}
+.ACHAT{color:var(--buy)}.VENTE{color:var(--sell)}.ATTENDRE{color:var(--wait)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.k{background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:10px}
+.k small{display:block;color:var(--mu);font-size:.72rem;text-transform:uppercase;letter-spacing:.4px}
+.k b{font-size:1.1rem}
+.tag{display:inline-block;background:var(--bg);border:1px solid var(--bd);border-radius:999px;padding:3px 10px;font-size:.8rem;margin:3px 4px 0 0}
+ul{padding-left:18px;margin:6px 0}
+.note{color:var(--mu);font-size:.78rem;margin-top:10px}
+.err{color:var(--sell);font-size:.9rem;margin-top:10px}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Chart Scanner</h1>
-  <div class="sub">Upload un screenshot du graphique. L'IA lit les bougies et te donne : acheter / vendre, prix d'entrée, durée du trade.</div>
-
-  <div class="card" id="keyCard">
-    <label>Clé API Groq</label>
-    <input id="key" type="password" placeholder="gsk_..." autocomplete="off">
-    <div class="small" style="margin-top:6px">Enregistrée seulement dans ton navigateur (localStorage). <span class="link" id="clearKey">Effacer</span></div>
-  </div>
+<div class="w">
+  <h1>Scanner de graphique</h1>
+  <div class="sub">Envoie un screenshot : le scanner détecte le concept, puis donne achat/vente, prix d’entrée et durée.</div>
 
   <div class="card">
-    <div class="drop" id="drop">
-      <div><b>Clique</b>, glisse une image ici, ou colle avec <b>Ctrl+V</b></div>
-      <div class="small" style="margin-top:6px">PNG / JPG — screenshot du graphique</div>
-    </div>
+    <div class="drop" id="drop">Touche ici ou glisse ton screenshot</div>
     <input type="file" id="file" accept="image/*" hidden>
-    <img id="preview" alt="aperçu">
-
-    <div class="row" style="margin-top:14px">
-      <div>
-        <label>Prix d'entrée (optionnel)</label>
-        <input id="entry" inputmode="decimal" placeholder="ex: 1.1220">
-      </div>
-      <div>
-        <label>Timeframe du graphique</label>
-        <select id="tf">
-          <option value="">Détecter automatiquement</option>
-          <option>5 secondes</option><option>15 secondes</option><option>30 secondes</option>
-          <option>1 minute</option><option>2 minutes</option><option>5 minutes</option>
-          <option>15 minutes</option><option>30 minutes</option><option>1 heure</option>
-          <option>4 heures</option><option>1 jour</option>
-        </select>
-      </div>
-      <div>
-        <label>Paire / actif (optionnel)</label>
-        <input id="pair" placeholder="ex: EUR/USD">
-      </div>
+    <img id="prev" alt="Aperçu du graphique">
+    <div class="row">
+      <label style="flex-basis:100%">Clé API Anthropic (reste dans ton navigateur)<input id="key" type="password" placeholder="sk-ant-..." autocomplete="off"></label>
     </div>
-
-    <button class="go" id="go" disabled>Scanner le graphique</button>
-    <div class="err" id="err"></div>
+    <div class="row">
+      <label>Paire / actif (optionnel)<input id="pair" placeholder="ex. EUR/USD"></label>
+      <label>Timeframe (optionnel)<select id="tf"><option value="">Laisser le scanner deviner</option><option>5 secondes</option><option>15 secondes</option><option>30 secondes</option><option>1 minute</option><option>5 minutes</option><option>15 minutes</option></select></label>
+    </div>
+    <button id="go" disabled>Scanner</button>
+    <div id="err" class="err"></div>
   </div>
 
-  <div id="result">
-    <div class="decision" id="decision">
-      <div class="small">DÉCISION</div>
-      <div class="d" id="dTxt">—</div>
-      <div class="small" id="dSub"></div>
-    </div>
-
-    <div class="card">
-      <div class="grid">
-        <div class="kpi"><span>Prix d'entrée</span><b id="kEntry">—</b></div>
-        <div class="kpi"><span>Durée du trade</span><b id="kDur">—</b></div>
-        <div class="kpi"><span>Timeframe lu</span><b id="kTf">—</b></div>
-        <div class="kpi"><span>Tendance</span><b id="kTrend">—</b></div>
-        <div class="kpi"><span>Stop / Invalidation</span><b id="kSl">—</b></div>
-        <div class="kpi"><span>Objectif</span><b id="kTp">—</b></div>
-      </div>
-      <div style="margin-top:14px">
-        <label>Confiance</label>
-        <b id="kConf">—</b>
-        <div class="bar"><i id="confBar"></i></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <label>Concepts détectés sur le graphique</label>
-      <div id="concepts"></div>
-    </div>
-
-    <div class="card">
-      <label>Pourquoi cette décision</label>
-      <ul id="reasons"></ul>
-      <label style="margin-top:14px">Niveaux repérés</label>
-      <ul id="levels"></ul>
-      <label style="margin-top:14px">Quand ne pas entrer</label>
-      <div id="avoid" style="font-size:14px;line-height:1.45"></div>
-    </div>
-
-    <div class="warn">L'analyse est une lecture IA d'une image : elle peut se tromper et aucun résultat n'est garanti. Les options binaires et le trading comportent un risque de perte totale. Ne mise que ce que tu peux perdre.</div>
-  </div>
+  <div id="out"></div>
+  <div class="note">Outil d’aide à la lecture du graphique, pas une garantie. Une seule image ne montre ni les news ni le contexte : garde toujours un stop et une mise que tu peux perdre.</div>
 </div>
 
 <script>
-const STRATEGIES = [
- "Trend Following","Price Action","Breakout Trading","Pullback Trading","Range Trading","Swing Trading",
- "Position Trading","Momentum Trading","Mean Reversion","Support & Resistance","Fibonacci Trading",
- "Moving Average Strategy","RSI Strategy","MACD Strategy","Bollinger Bands","Ichimoku","Elliott Wave",
- "Harmonic Patterns","Candlestick Patterns","Fundamental Analysis"
-];
-const ADVANCED = [
- "Smart Money Concepts (SMC)","ICT Concepts","Wyckoff Method","Market Structure","Liquidity Concepts",
- "Order Blocks","Fair Value Gaps (FVG)","Volume Profile","Market Profile","Auction Market Theory",
- "Supply and Demand","Multi-Timeframe Analysis"
-];
-const MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+const $=id=>document.getElementById(id);
+let blob=null;
+try{const k=localStorage.getItem("anthropic_key");if(k)document.getElementById("key").value=k}catch(_){}
+const STRAT="Trend Following, Price Action, Breakout Trading, Pullback Trading, Range Trading, Swing Trading, Position Trading, Momentum Trading, Mean Reversion, Support & Resistance, Fibonacci Trading, Moving Average Strategy, RSI Strategy, MACD Strategy, Bollinger Bands, Ichimoku, Elliott Wave, Harmonic Patterns, Candlestick Patterns, Fundamental Analysis";
+const ADV="Smart Money Concepts (SMC), ICT Concepts, Wyckoff Method, Market Structure, Liquidity Concepts, Order Blocks, Fair Value Gaps (FVG), Volume Profile, Market Profile, Auction Market Theory, Supply and Demand, Multi-Timeframe Analysis";
 
-const $ = id => document.getElementById(id);
-let imgData = null;
-
-$('key').value = localStorage.getItem('groq_key') || '';
-$('key').addEventListener('input', e => localStorage.setItem('groq_key', e.target.value.trim()));
-$('clearKey').onclick = () => { localStorage.removeItem('groq_key'); $('key').value=''; };
-
-const drop = $('drop'), file = $('file');
-drop.onclick = () => file.click();
-file.onchange = e => e.target.files[0] && loadFile(e.target.files[0]);
-['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => {e.preventDefault(); drop.classList.add('over')}));
-['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => {e.preventDefault(); drop.classList.remove('over')}));
-drop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
-window.addEventListener('paste', e => {
-  const it = [...(e.clipboardData?.items||[])].find(i => i.type.startsWith('image/'));
-  if (it) loadFile(it.getAsFile());
-});
-
-function loadFile(f){
-  if(!f.type.startsWith('image/')){ showErr("Ce fichier n'est pas une image."); return; }
-  const r = new FileReader();
-  r.onload = () => {
-    const im = new Image();
-    im.onload = () => {
-      // Réduit l'image pour rester sous la limite de l'API tout en gardant les bougies lisibles
-      const max = 1400, s = Math.min(1, max / Math.max(im.width, im.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(im.width*s); c.height = Math.round(im.height*s);
-      c.getContext('2d').drawImage(im,0,0,c.width,c.height);
-      imgData = c.toDataURL('image/jpeg', .88);
-      $('preview').src = imgData; $('preview').style.display = 'block';
-      $('go').disabled = false; hideErr();
-    };
-    im.src = r.result;
-  };
-  r.readAsDataURL(f);
+function setFile(f){
+  if(!f||!f.type.startsWith("image/"))return;
+  blob=f;
+  const p=$("prev");p.src=URL.createObjectURL(f);p.style.display="block";
+  $("drop").textContent="Image prête — touche pour changer";
+  $("go").disabled=false;$("err").textContent="";
 }
+$("drop").onclick=()=>$("file").click();
+$("file").onchange=e=>setFile(e.target.files[0]);
+["dragover","dragenter"].forEach(ev=>$("drop").addEventListener(ev,e=>{e.preventDefault();$("drop").classList.add("on")}));
+["dragleave","drop"].forEach(ev=>$("drop").addEventListener(ev,e=>{e.preventDefault();$("drop").classList.remove("on")}));
+$("drop").addEventListener("drop",e=>setFile(e.dataTransfer.files[0]));
 
-function showErr(m){ const e=$('err'); e.textContent=m; e.style.display='block'; }
-function hideErr(){ $('err').style.display='none'; }
+function esc(s){const d=document.createElement("div");d.textContent=s==null?"":String(s);return d.innerHTML}
 
-function buildPrompt(){
-  const entry = $('entry').value.trim(), tf = $('tf').value, pair = $('pair').value.trim();
-  return `Tu es un analyste technique expert en Forex et options binaires. Tu reçois un screenshot d'un graphique en chandeliers (souvent Pocket Option).
-
-ÉTAPES:
-1. Lis le graphique: actif, timeframe (échelle de temps / durée d'une bougie), prix actuel, tendance, structure, niveaux, indicateurs visibles.
-2. Identifie la stratégie principale et les concepts qui s'appliquent le mieux, en choisissant UNIQUEMENT dans ces listes.
-STRATÉGIES: ${STRATEGIES.join(", ")}.
-CONCEPTS AVANCÉS: ${ADVANCED.join(", ")}.
-3. Décide: BUY (acheter/haut), SELL (vendre/bas) ou WAIT (pas de setup clair, attendre).
-4. Donne un prix d'entrée précis, ${entry ? `l'utilisateur prévoit d'entrer à ${entry}: évalue ce prix et ajuste si mauvais` : "basé sur le prix visible à droite du graphique ou un niveau d'entrée logique (pullback/retest)"}.
-5. Donne la durée du trade en MINUTES, cohérente avec le timeframe (en règle générale 1 à 5 bougies du timeframe lu; ex: bougies 1 min -> 2 à 5 min; bougies 5 s -> 1 min).
-
-CONTEXTE FOURNI: ${pair ? "Actif: "+pair+". " : ""}${tf ? "Timeframe: "+tf+"." : "Timeframe non fourni: déduis-le de l'axe du temps."}
-
-RÈGLES:
-- Base-toi uniquement sur ce qui est visible. N'invente pas de niveaux illisibles. Si l'image est floue ou illisible, mets WAIT et explique.
-- Si le marché est confus, en range serré ou sans confirmation, choisis WAIT.
-- Sois honnête sur la confiance (0-100). Ne dépasse pas 80 sauf confluence très claire.
-- Réponds en français.
-
-Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, avec exactement ces clés:
-{
- "decision": "BUY" | "SELL" | "WAIT",
- "entry_price": "string (ex: 1.12200)",
- "duration_minutes": number,
- "timeframe_detected": "string",
- "pair_detected": "string",
- "trend": "Haussière" | "Baissière" | "Range",
- "confidence": number,
- "main_strategy": "une stratégie de la liste",
- "other_concepts": ["concepts de la liste"],
- "stop_level": "string ou N/A",
- "target_level": "string ou N/A",
- "key_levels": ["supports/résistances/zones repérés avec prix approximatif"],
- "reasons": ["3 à 5 raisons concrètes liées à ce qui est visible"],
- "avoid_if": "string: condition qui invalide le trade"
-}`;
-}
-
-$('go').onclick = async () => {
-  hideErr();
-  const key = $('key').value.trim();
-  if(!key){ showErr("Entre ta clé API Groq (gsk_...)."); return; }
-  if(!imgData){ showErr("Upload d'abord un screenshot."); return; }
-  const btn = $('go'); btn.disabled = true; btn.textContent = "Analyse en cours...";
+$("go").onclick=async()=>{
+  $("err").textContent="";
+  const btn=$("go");btn.disabled=true;btn.textContent="Analyse en cours…";
   try{
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions",{
+    const key=$("key").value.trim();
+    if(!key){throw new Error("Colle ta clé API Anthropic dans le champ prévu.");}
+    try{localStorage.setItem("anthropic_key",key)}catch(_){}
+    const pair=$("pair").value.trim(),tf=$("tf").value;
+    const prompt=`Tu es un analyste de graphiques de trading (scalping binaire/forex, bougies courtes). Analyse le screenshot joint.
+${pair?"Actif indiqué : "+pair+".":""} ${tf?"Timeframe indiqué : "+tf+".":"Timeframe non indiqué : déduis-le de l’axe du temps si visible, sinon dis-le."}
+
+Étapes :
+1. Décris le graphique (tendance, structure, niveaux, indicateurs visibles).
+2. Choisis le concept principal (et 1 à 3 secondaires) parmi :
+Stratégies : ${STRAT}.
+Concepts avancés : ${ADV}.
+3. Décide : "ACHAT", "VENTE" ou "ATTENDRE". Si les signaux sont faibles, contradictoires ou si le graphique est illisible, réponds "ATTENDRE" : ne force jamais un trade.
+4. Prix d’entrée : lis les valeurs sur l’axe des prix du screenshot (dernier prix / niveau précis pour entrer). N’invente aucun chiffre : si l’axe n’est pas lisible, mets null et explique.
+5. Durée du trade en minutes, cohérente avec le timeframe (ex. bougies 5 s ou 15 s → 1 à 3 min ; M1 → 3 à 5 min).
+6. Niveau d’invalidation (stop) et objectif (cible) en prix si lisibles.
+
+Réponds UNIQUEMENT avec du JSON valide, en français, sans markdown, de cette forme :
+{"decision":"ACHAT|VENTE|ATTENDRE","confiance":"FAIBLE|MODÉRÉE|FORTE","concept_principal":"...","concepts_secondaires":["..."],"timeframe_detecte":"...","description_graphique":"2-3 phrases","prix_entree":"1.1220 ou null","type_entree":"au marché | limite sur retest de ... ","stop":"... ou null","objectif":"... ou null","duree_minutes":"ex. 3","raisons":["...","...","..."],"risques":["..."]}`;
+    const b64=await new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(r.result.split(",")[1]);r.onerror=()=>ko(new Error("Lecture de l’image impossible"));r.readAsDataURL(blob)});
+    const resp=await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST",
-      headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+key },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.2,
-        max_tokens: 1200,
-        response_format: { type: "json_object" },
-        messages:[{ role:"user", content:[
-          { type:"text", text: buildPrompt() },
-          { type:"image_url", image_url:{ url: imgData } }
-        ]}]
-      })
+      headers:{"Content-Type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+      body:JSON.stringify({model:"claude-sonnet-5-5",max_tokens:1500,messages:[{role:"user",content:[
+        {type:"image",source:{type:"base64",media_type:blob.type||"image/png",data:b64}},
+        {type:"text",text:prompt}]}]})
     });
-    if(!res.ok){
-      const t = await res.text();
-      throw new Error("Erreur API ("+res.status+")\n"+t.slice(0,400));
-    }
-    const data = await res.json();
-    const raw = data.choices?.[0]?.message?.content || "";
-    let j;
-    try { j = JSON.parse(raw); }
-    catch { const m = raw.match(/\{[\s\S]*\}/); if(!m) throw new Error("Réponse illisible: "+raw.slice(0,200)); j = JSON.parse(m[0]); }
-    render(j);
+    const data=await resp.json();
+    if(!resp.ok){throw new Error((data.error&&data.error.message)||"Erreur API "+resp.status);}
+    const txt=data.content.filter(c=>c.type==="text").map(c=>c.text).join("").replace(/```json|```/g,"").trim();
+    const res=JSON.parse(txt.slice(txt.indexOf("{"),txt.lastIndexOf("}")+1));
+    render(res);
   }catch(e){
-    showErr(e.message || String(e));
-  }finally{
-    btn.disabled = false; btn.textContent = "Scanner le graphique";
-  }
+    $("err").textContent=(e&&e.message)?e.message:"Erreur pendant l’analyse. Réessaie.";
+  }finally{btn.disabled=false;btn.textContent="Scanner";}
 };
 
-function render(j){
-  const d = String(j.decision||"WAIT").toUpperCase();
-  const cls = d==="BUY"?"BUY":d==="SELL"?"SELL":"WAIT";
-  const label = cls==="BUY"?"ACHETER ▲":cls==="SELL"?"VENDRE ▼":"ATTENDRE ■";
-  const dec = $('decision'); dec.className = "decision "+cls;
-  $('dTxt').textContent = label;
-  $('dSub').textContent = [j.pair_detected, j.main_strategy].filter(Boolean).join(" · ");
-
-  const userEntry = $('entry').value.trim();
-  $('kEntry').textContent = cls==="WAIT" ? "—" : (j.entry_price || userEntry || "—");
-  const dur = Number(j.duration_minutes);
-  $('kDur').textContent = cls==="WAIT" ? "—" : (dur ? (dur<1 ? Math.round(dur*60)+" sec" : dur+" min") : "—");
-  $('kTf').textContent = j.timeframe_detected || "—";
-  $('kTrend').textContent = j.trend || "—";
-  $('kSl').textContent = j.stop_level || "N/A";
-  $('kTp').textContent = j.target_level || "N/A";
-  const c = Math.max(0, Math.min(100, Number(j.confidence)||0));
-  $('kConf').textContent = c+"%"; $('confBar').style.width = c+"%";
-
-  const cc = $('concepts'); cc.innerHTML = "";
-  const add = (t, main) => { const s=document.createElement('span'); s.className="tag"+(main?" main":""); s.textContent=t; cc.appendChild(s); };
-  if(j.main_strategy) add(j.main_strategy, true);
-  (j.other_concepts||[]).forEach(x => add(x,false));
-
-  const fill = (id, arr) => { const u=$(id); u.innerHTML=""; (arr||[]).forEach(t => { const li=document.createElement('li'); li.textContent=t; u.appendChild(li); }); };
-  fill('reasons', j.reasons); fill('levels', j.key_levels);
-  $('avoid').textContent = j.avoid_if || "—";
-
-  $('result').style.display = 'block';
-  $('result').scrollIntoView({behavior:'smooth', block:'start'});
+function render(r){
+  const d=(r.decision||"ATTENDRE").toUpperCase().replace("É","E");
+  const cls=["ACHAT","VENTE"].includes(d)?d:"ATTENDRE";
+  const li=a=>(a||[]).map(x=>"<li>"+esc(x)+"</li>").join("");
+  const sec=(r.concepts_secondaires||[]).map(x=>'<span class="tag">'+esc(x)+"</span>").join("");
+  $("out").innerHTML=`<div class="card">
+    <div class="dec ${cls}">${cls}</div>
+    <div style="color:var(--mu);font-size:.9rem">Confiance : ${esc(r.confiance)} · Timeframe : ${esc(r.timeframe_detecte)}</div>
+    <div class="grid">
+      <div class="k"><small>Prix d’entrée</small><b>${esc(r.prix_entree||"Non lisible")}</b></div>
+      <div class="k"><small>Durée</small><b>${esc(r.duree_minutes)} min</b></div>
+      <div class="k"><small>Stop</small><b>${esc(r.stop||"—")}</b></div>
+      <div class="k"><small>Objectif</small><b>${esc(r.objectif||"—")}</b></div>
+    </div>
+    <p style="margin:12px 0 0"><small style="color:var(--mu)">TYPE D’ENTRÉE</small><br>${esc(r.type_entree)}</p>
+  </div>
+  <div class="card">
+    <small style="color:var(--mu)">CONCEPT DÉTECTÉ</small>
+    <div style="font-size:1.1rem;font-weight:700;margin:2px 0">${esc(r.concept_principal)}</div>
+    ${sec}
+    <p>${esc(r.description_graphique)}</p>
+    <small style="color:var(--mu)">POURQUOI</small><ul>${li(r.raisons)}</ul>
+    <small style="color:var(--mu)">RISQUES</small><ul>${li(r.risques)}</ul>
+  </div>`;
+  $("out").scrollIntoView({behavior:"smooth"});
 }
 </script>
 </body>
